@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+
+# Installer logs
+install.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ZastTranslate specific
+temp/
+output/
+models/
+cache/
+logs/
+pretrained_models/
+cosyvoice/
+*.mp3
+*.wav
+*.mp4
+*.m4a
+*.flac
+
+# Local / generated files
+ENVIRONMENT
+4.10.0
+ZastTranslate_SPEC.md
+
+# AI agent config files
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+QWEN.md
+.clinerules
+.cursorrules
+.windsurfrules
+.geminiignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
