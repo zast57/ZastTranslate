@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 0.9
+# ZastTranslate — Beta 0.91
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ⚠️ **Beta 0.9**: This software is under active development. Tested on **Windows only**. Some features may change.
+> ⚠️ **Beta 0.91**: This software is under active development. Tested on **Windows only**. Some features may change.
 
 Translate any video into 10 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -18,6 +18,7 @@ Translate any video into 10 languages with natural-sounding dubbed audio. Option
 - 🗣️ **Voice Cloning**: Qwen3-TTS zero-shot voice cloning from original audio or uploaded sample
 - 🔊 **Smart Dubbing**: Auto-adjusts text length & speech speed to match original timing
 - 🎵 **Audio Separation**: Demucs isolates vocals from background music/FX, then remixes with dubbed voice
+- 🚀 **Bulk Mode**: Translate, dub, and export to multiple languages automatically in one single click
 - 📝 **Editable**: Review and edit transcription & translation before dubbing
 - 📦 **Export**: Final MP4 video + SRT subtitles
 - 🗑️ **Cleanup**: "New Project" deletes all temporary files to free disk space
@@ -109,6 +110,22 @@ Generate the dubbed video with synthesized speech.
 
 ![Dubbing tab](tuto4.jpg)
 
+### Step 5 — Bulk Mode
+
+Automate the translation and dubbing process for multiple languages down to a single click!
+
+1. After validating the transcription in **Tab 2**, switch directly to **Tab 5**.
+2. Select all the target languages you want from the dropdown list.
+3. Choose your voice options (whether to clone or not, etc.).
+4. Choose your output: 
+   - **Video + Audio**: Generates the final MP4 dubbed videos and the WAV audio tracks.
+   - **Audio Only**: Generates only the WAV mixed audio tracks and SRTs (faster if you don't need videos).
+5. Click **Run Bulk Process** and wait. The software will process each language sequentially and provide a batch download of all generated media at the bottom of the screen.
+
+![Bulk Mode Settings](bulk.jpg)
+
+![Bulk Mode Processing](bulk2.jpg)
+
 ### ℹ️ Help tab
 
 The built-in Help tab provides detailed usage instructions, troubleshooting tips, and system information.
@@ -190,3 +207,10 @@ These messages appear in the terminal but **do not affect functionality** and ca
 ## License
 
 MIT
+
+## History
+
+- **Version 0.91** 
+  - Bulk.
+- **Version 0.9** 
+  - Initial release.
