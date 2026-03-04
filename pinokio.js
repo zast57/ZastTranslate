@@ -65,6 +65,10 @@ module.exports = {
           text: "Update",
           href: "update.js"
         }, {
+          icon: "fa-solid fa-wrench",
+          text: "Fix Update (If Upgrade fails)",
+          href: "fix_update.js"
+        }, {
           icon: "fa-solid fa-plug",
           text: "Reinstall",
           href: "install.js"
