@@ -175,6 +175,13 @@ curl -X POST http://localhost:7860/api/predict \
 
 ## Troubleshooting
 
+### ⚠️ Cannot Upgrade to 0.91 (Divergent branches / Numpy Pip error)
+If you installed ZastTranslate v0.9 from GitHub and the **Upgrade** button fails with a `divergent branches` or `numpy` conflict error, your local update script is outdated.
+**How to fix:**
+1. Delete ZastTranslate from your Pinokio home screen (click the 🗑️ icon).
+2. Go to **Discover** or use the search bar to reinstall the app.
+3. The new installation comes with the fixed updater, and you will never encounter this error on future updates.
+
 - **Models download on first run** — WhisperX, Qwen3-8B, Demucs, and TTS models are cached in HuggingFace's default cache directory
 - **Out of VRAM**: Models are loaded/unloaded sequentially to minimize memory usage
 - **Clean install**: Click **Reset** then **Install** to start fresh
