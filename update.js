@@ -4,7 +4,7 @@ module.exports = {
         {
             method: "shell.run",
             params: {
-                message: "git pull"
+                message: "git pull --rebase --autostash"
             }
         },
         // 2. Update Python dependencies
@@ -14,8 +14,7 @@ module.exports = {
                 venv: "env",
                 path: ".",
                 message: [
-                    "pip install -r requirements.txt --upgrade",
-                    "pip install \"numpy>=1.24.0,<2.0\""
+                    "pip install -r requirements.txt --upgrade"
                 ]
             }
         },
