@@ -499,16 +499,17 @@ def export_audio():
     return "No audio available. Run Dubbing first.", None
 
 
-def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type, progress=gr.Progress()):
+def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type, bulk_title, bulk_desc, progress=gr.Progress()):
     if not state.segments:
         yield "Error: No transcription available.", None
         return
         
     if not target_langs:
-        yield "Error: Please select at least one target language.", None
+        yield "Error: Please select at least one target language.", None, ""
         return
 
     output_files = []
+    metadata_display = ""
     total_langs = len(target_langs)
     
     # Detect source language from transcription
@@ -516,16 +517,18 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
     
     # Check if we need to separate background audio (e.g. if skipped via SRT import)
     if state.video_info and 'background' not in state.video_info:
-        yield "Separating background audio (was skipped)...", output_files
+        yield "Separating background audio (was skipped)...", output_files, metadata_display
         stems = separator.separate(state.video_info['audio_44k'])
         state.video_info['vocals'] = stems['vocals']
         state.video_info['background'] = stems['background']
         separator.cleanup()
     
+    # Phase 1: Translate ALL languages first to prevent VRAM fragmentation
+    all_translated_segments = {}
     for idx, target_lang in enumerate(target_langs):
         # Progress math setup
-        base_progress = idx / total_langs
-        prog_step = 1.0 / total_langs
+        base_progress = (idx / total_langs) * 0.5
+        prog_step = 0.5 / total_langs
         
         target_lang_code = LANGUAGES.get(target_lang, target_lang)
         iso = _get_iso_code(target_lang_code)
@@ -535,18 +538,30 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         if state.video_info:
             state.video_info['target_language'] = target_lang_code
             
-        yield f"[{idx+1}/{total_langs}] Translating {target_lang}...", output_files
+        yield f"[{idx+1}/{total_langs}] TRANSLATION PHASE: {target_lang}...", output_files, ""
         
-        # --- TRANSLATION PHASE ---
-        progress(base_progress + prog_step * 0.1, f"[{target_lang}] Fitted translation...")
+        # Translate Title and Description if provided
+        translated_title = ""
+        translated_desc = ""
+        if bulk_title or bulk_desc:
+            progress(base_progress + prog_step * 0.1, f"[{target_lang}] Translating metadata...")
+            if bulk_title:
+                translated_title = reformulator.translate_text(bulk_title, source_lang, target_lang_code)
+            if bulk_desc:
+                translated_desc = reformulator.translate_text(bulk_desc, source_lang, target_lang_code)
+            
+            meta_text = f"### {target_lang} Metadata\n**Title:** {translated_title}\n\n**Description:** {translated_desc}\n\n---\n"
+            metadata_display += meta_text
+            yield f"[{idx+1}/{total_langs}] TRANSLATION PHASE: {target_lang}...", output_files, metadata_display
+        
+        progress(base_progress + prog_step * 0.2, f"[{target_lang}] Fitted translation...")
         translated = reformulator.translate_segments(
             state.segments, source_lang, target_lang, target_lang_code,
             cps=cps, speed_factor=MAX_SPEED_FACTOR
         )
-        state.translated_segments = translated
         
-        progress(base_progress + prog_step * 0.2, f"[{target_lang}] Reformulating long segments...")
-        for seg in state.translated_segments:
+        progress(base_progress + prog_step * 0.5, f"[{target_lang}] Reformulating long segments...")
+        for seg in translated:
             text = seg.get("translated_text", "")
             duration = seg["end"] - seg["start"]
             max_chars = int(duration * cps * MAX_SPEED_FACTOR)
@@ -560,64 +575,78 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
                 except Exception as e:
                     print(f"Reformulation failed for {target_lang}: {e}")
                     
-        progress(base_progress + prog_step * 0.3, f"[{target_lang}] Natural full translation...")
-        reformulator.translate_normal(state.translated_segments, source_lang, target_lang_code)
-        reformulator.cleanup()
+        progress(base_progress + prog_step * 0.8, f"[{target_lang}] Natural full translation...")
+        reformulator.translate_normal(translated, source_lang, target_lang_code)
         
         # Save SRTs
         trans_srt = os.path.join(TEMP_DIR, f"translation_{iso}.srt")
-        srt_parser.segments_to_srt(state.translated_segments, trans_srt, text_key="normal_text")
+        srt_parser.segments_to_srt(translated, trans_srt, text_key="normal_text")
         output_files.append(trans_srt)
         
         fitted_srt = os.path.join(TEMP_DIR, f"fitted_{iso}.srt")
-        srt_parser.segments_to_srt(state.translated_segments, fitted_srt, text_key="translated_text")
+        srt_parser.segments_to_srt(translated, fitted_srt, text_key="translated_text")
         output_files.append(fitted_srt)
 
-        # --- SYNTHESIS PHASE ---
-        yield f"[{idx+1}/{total_langs}] Synthesizing {target_lang}...", output_files
-        progress(base_progress + prog_step * 0.4, f"[{target_lang}] Initializing TTS...")
+        # Store for the synthesis phase
+        import copy
+        all_translated_segments[target_lang] = copy.deepcopy(translated)
 
-        voice_path = None
-        if voice_mode == "Clone from original" and state.video_info and 'vocals' in state.video_info:
-            voice_path = state.video_info['vocals']
-        elif voice_mode == "Clone from file" and voice_file:
-            voice_path = voice_file
+    # CRITICAL: Clean up LLM from VRAM completely before loading TTS
+    reformulator.cleanup()
+    
+    # Phase 2: Synthesize ALL languages
+    # Determine voice path ONCE before loading model
+    initial_voice_path = None
+    if voice_mode == "Clone from original" and state.video_info and 'vocals' in state.video_info:
+        initial_voice_path = state.video_info['vocals']
+    elif voice_mode == "Clone from file" and voice_file:
+        initial_voice_path = voice_file
 
-        tts_engine.load_model(voice_path=voice_path)
-        if voice_path:
-            tts_engine.set_reference_audio(voice_path)
+    tts_engine.load_model(voice_path=initial_voice_path) # Load once with correct model type
+    
+    for idx, target_lang in enumerate(target_langs):
+        base_progress = 0.5 + (idx / total_langs) * 0.5
+        prog_step = 0.5 / total_langs
+
+        target_lang_code = LANGUAGES.get(target_lang, target_lang)
+        iso = _get_iso_code(target_lang_code)
+
+        yield f"[{idx+1}/{total_langs}] SYNTHESIS PHASE: {target_lang}...", output_files, metadata_display
+        progress(base_progress + prog_step * 0.2, f"[{target_lang}] Initializing TTS...")
+
+        if initial_voice_path:
+            tts_engine.set_reference_audio(initial_voice_path)
+
+        translated_for_lang = all_translated_segments[target_lang]
 
         if never_cut:
-            progress(base_progress + prog_step * 0.6, f"[{target_lang}] Audio sync (Never Cut)...")
+            progress(base_progress + prog_step * 0.4, f"[{target_lang}] Audio sync (Never Cut)...")
             synced, _ = time_sync.sync_all_never_cut(
-                state.translated_segments, target_lang_code,
+                translated_for_lang, target_lang_code,
                 state.video_info['duration'], voice_mapping=None
             )
-            state.synced_segments = synced
-            tts_engine.cleanup()
             
-            progress(base_progress + prog_step * 0.8, f"[{target_lang}] Assembling audio...")
+            progress(base_progress + prog_step * 0.7, f"[{target_lang}] Assembling audio...")
             full_audio = time_sync.build_full_audio(
-                state.synced_segments,
+                synced,
                 state.video_info['duration'],
                 use_real_positions=True
             )
         else:
-            progress(base_progress + prog_step * 0.5, f"[{target_lang}] Pre-checking timing...")
-            state.translated_segments, _ = time_sync.pre_check_and_shorten(
-                state.translated_segments, target_lang_code
+            progress(base_progress + prog_step * 0.3, f"[{target_lang}] Pre-checking timing...")
+            translated_for_lang, _ = time_sync.pre_check_and_shorten(
+                translated_for_lang, target_lang_code
             )
             
-            progress(base_progress + prog_step * 0.6, f"[{target_lang}] Generating audio...")
-            state.synced_segments, _ = time_sync.sync_all(
-                state.translated_segments, target_lang_code, voice_mapping=None,
+            progress(base_progress + prog_step * 0.5, f"[{target_lang}] Generating audio...")
+            synced, _ = time_sync.sync_all(
+                translated_for_lang, target_lang_code, voice_mapping=None,
                 total_duration=state.video_info.get('duration')
             )
-            tts_engine.cleanup()
             
-            progress(base_progress + prog_step * 0.8, f"[{target_lang}] Assembling audio...")
+            progress(base_progress + prog_step * 0.7, f"[{target_lang}] Assembling audio...")
             full_audio = time_sync.build_full_audio(
-                state.synced_segments, 
+                synced, 
                 state.video_info['duration']
             )
 
@@ -630,7 +659,7 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
 
         # --- VIDEO ASSEMBLY PHASE ---
         if output_type == "Video + Audio":
-            yield f"[{idx+1}/{total_langs}] Assembling Video {target_lang}...", output_files
+            yield f"[{idx+1}/{total_langs}] Assembling Video {target_lang}...", output_files, metadata_display
             progress(base_progress + prog_step * 0.9, f"[{target_lang}] Mixed video assembly...")
             
             final_video = os.path.join(OUTPUT_DIR, f"final_video_{iso}.mp4")
@@ -641,7 +670,8 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
             )
             output_files.append(final_video)
             
-    yield f"Completed! Processed {total_langs} languages.", output_files
+    tts_engine.cleanup()
+    yield f"Completed! Processed {total_langs} languages.", output_files, metadata_display
 
 
 # --- GRADIO INTERFACE ---
@@ -655,7 +685,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         with open(_logo_path, "rb") as _f:
             _logo_b64 = _b64.b64encode(_f.read()).decode()
         _logo_html = f"<center><img src='data:image/png;base64,{_logo_b64}' width='80' /></center>\n\n"
-    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 0.91\n**Offline video translation & dubbing (No Lip-Sync)**")
+    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 0.95\n**Offline video translation & dubbing (No Lip-Sync)**")
     
     with gr.Tab("1. Import"):
         url_input = gr.Textbox(label="YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
@@ -756,6 +786,10 @@ with gr.Blocks(title="ZastTranslate") as app:
         )
         
         with gr.Row():
+            bulk_title_input = gr.Textbox(label="Original Video Title (Optional)", placeholder="Title...")
+            bulk_desc_input = gr.Textbox(label="Original Video Description (Optional)", placeholder="Description...", lines=3)
+        
+        with gr.Row():
             bulk_voice_mode = gr.Radio(
                 ["Default voice", "Clone from original", "Clone from file"], 
                 label="Voice Mode", 
@@ -779,6 +813,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         
         btn_bulk_run = gr.Button("Run Bulk Process", interactive=False, variant="primary")
         bulk_status_output = gr.Textbox(label="Status", interactive=False)
+        bulk_metadata_output = gr.Markdown(label="Translated Metadata")
         bulk_files_output = gr.File(label="Generated Files Output", file_count="multiple")
 
     with gr.Tab("ℹ️ Help"):
@@ -924,7 +959,11 @@ with gr.Blocks(title="ZastTranslate") as app:
     btn_synth.click(step6_synthesize, [voice_mode, voice_file, never_cut_mode], [synth_status, final_video_out, final_audio_out])
     btn_export_audio.click(export_audio, [], [synth_status, export_audio_file])
     
-    btn_bulk_run.click(step5_bulk_run, [bulk_target_langs, bulk_voice_mode, bulk_voice_file, bulk_never_cut_mode, bulk_output_type], [bulk_status_output, bulk_files_output])
+    btn_bulk_run.click(
+        step5_bulk_run, 
+        [bulk_target_langs, bulk_voice_mode, bulk_voice_file, bulk_never_cut_mode, bulk_output_type, bulk_title_input, bulk_desc_input], 
+        [bulk_status_output, bulk_files_output, bulk_metadata_output]
+    )
 
 if __name__ == "__main__":
     app.launch(

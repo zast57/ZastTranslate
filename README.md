@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 0.91
+# ZastTranslate — Beta 0.95
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ⚠️ **Beta 0.91**: This software is under active development. Tested on **Windows only**. Some features may change.
+> ⚠️ **Beta 0.95**: This software is under active development. Tested on **Windows only**. Some features may change.
 
 Translate any video into 10 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -14,7 +14,7 @@ Translate any video into 10 languages with natural-sounding dubbed audio. Option
 
 - 🎬 **Input**: YouTube URL (with resolution picker) or local video file
 - 🎙️ **Transcription**: WhisperX with word-level timestamps — 20+ source languages
-- 🌍 **Translation**: Qwen3-8B LLM — 10 target languages (limited to Qwen3-TTS dubbing support)
+- 🌍 **Translation**: Qwen2.5-7B-Instruct LLM — 10 target languages (limited to Qwen3-TTS dubbing support)
 - 🗣️ **Voice Cloning**: Qwen3-TTS zero-shot voice cloning from original audio or uploaded sample
 - 🔊 **Smart Dubbing**: Auto-adjusts text length & speech speed to match original timing
 - 🎵 **Audio Separation**: Demucs isolates vocals from background music/FX, then remixes with dubbed voice
@@ -116,11 +116,14 @@ Automate the translation and dubbing process for multiple languages down to a si
 
 1. After validating the transcription in **Tab 2**, switch directly to **Tab 5**.
 2. Select all the target languages you want from the dropdown list.
-3. Choose your voice options (whether to clone or not, etc.).
-4. Choose your output: 
+3. *(Optional)* Fill in the **Original Video Title** and **Description**. The AI will translate them into every selected language and display them on-screen for easy copy-pasting.
+4. Choose your voice options (whether to clone or not, etc.).
+5. Choose your output: 
    - **Video + Audio**: Generates the final MP4 dubbed videos and the WAV audio tracks.
    - **Audio Only**: Generates only the WAV mixed audio tracks and SRTs (faster if you don't need videos).
-5. Click **Run Bulk Process** and wait. The software will process each language sequentially and provide a batch download of all generated media at the bottom of the screen.
+6. Click **Run Bulk Process** and wait. The software will process each language sequentially.
+
+> ⚡ **Memory Optimized**: In Bulk Mode, the pipeline translates ALL languages first, completely unloads the LLM, and then loads the Voice Synthesis AI. This prevents VRAM fragmentation and allows you to run massive multi-language batches efficiently even on an RTX 4090.
 
 ![Bulk Mode Settings](bulk.jpg)
 
@@ -152,7 +155,7 @@ from modules.tts_engine import TTSEngine
 transcriber = Transcriber()
 segments = transcriber.transcribe("video.mp4", language="en")
 
-# Translate (Qwen3-8B — translates + fits text to timing in one pass)
+# Translate (Qwen2.5-7B-Instruct — translates + fits text to timing in one pass)
 reformulator = Reformulator()
 reformulator.load_model()
 translated = reformulator.translate_segments(segments, source_lang="en",
@@ -205,7 +208,7 @@ These messages appear in the terminal but **do not affect functionality** and ca
 ## Credits
 
 - [WhisperX](https://github.com/m-bain/whisperX) — Speech recognition
-- [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) — Translation & text fitting
+- [Qwen2.5-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct) — Translation & text fitting
 - [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base) — Voice synthesis & cloning
 - [Demucs](https://github.com/facebookresearch/demucs) — Audio source separation
 - [Gradio](https://gradio.app/) — Web interface
@@ -217,7 +220,11 @@ MIT
 
 ## History
 
+- **Version 0.95**
+  - **Memory Optimization**: Completely refactored the Bulk Mode pipeline to process all translations before loading the TTS model, eliminating VRAM fragmentation and massive slowdowns.
+  - **Metadata Translation**: Added optional fields in Bulk Mode to automatically translate the Video Title and Description into all target languages.
+  - **Model Upgrade**: Switched the translation engine to `Qwen2.5-7B-Instruct` for flawless instruction following and zero translation bugs.
 - **Version 0.91** 
-  - Bulk.
+  - Added Bulk Mode (generate multiple languages in one click).
 - **Version 0.9** 
   - Initial release.
