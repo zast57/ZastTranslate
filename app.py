@@ -161,7 +161,7 @@ def step2_transcribe(lang_source, model_size, progress=gr.Progress()):
     
     return f"Transcription complete ({len(data)} segments). Review below, then click 'Validate Transcription'.", gr.Dataframe(value=data)
 
-def step2b_import_srt(srt_file):
+def step2b_import_srt(srt_file, lang_source):
     """Import an SRT file as transcription."""
     if srt_file is None:
         return "Error: No SRT file selected.", None
@@ -171,6 +171,18 @@ def step2b_import_srt(srt_file):
         
         if not segments:
             return "Error: No segments found in SRT file.", None
+        
+        if state.video_info is None:
+            state.video_info = {}
+            
+        source_lang_map = {
+            "Auto": "Auto", "French": "fr", "English": "en", "Spanish": "es",
+            "German": "de", "Italian": "it", "Portuguese": "pt", "Japanese": "ja",
+            "Korean": "ko", "Chinese": "zh", "Russian": "ru", "Arabic": "ar",
+            "Hindi": "hi", "Dutch": "nl", "Polish": "pl", "Turkish": "tr",
+            "Swedish": "sv", "Czech": "cs", "Romanian": "ro", "Hungarian": "hu",
+        }
+        state.video_info['detected_language'] = source_lang_map.get(lang_source, "Auto")
         
         # Convert to internal format
         state.segments = []
@@ -890,7 +902,7 @@ with gr.Blocks(title="ZastTranslate") as app:
     btn_reset.click(reset_project, [], [url_input, file_input, status_dl, video_preview, btn_transcribe, btn_translate, btn_synth, btn_bulk_run])
     
     btn_transcribe.click(step2_transcribe, [lang_source, model_size], [transcription_status, transcription_df])
-    btn_import_srt.click(step2b_import_srt, [srt_file_input], [transcription_status, transcription_df])
+    btn_import_srt.click(step2b_import_srt, [srt_file_input, lang_source], [transcription_status, transcription_df])
     
     btn_valid_transcription.click(step3_save_transcription, [transcription_df], [transcription_status, btn_translate, btn_bulk_run])
     btn_export_transcription.click(export_transcription_srt, [], [transcription_status, export_transcription_file])

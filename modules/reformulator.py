@@ -10,7 +10,7 @@ class Reformulator:
     Uses Qwen3-8B to translate and fit text to time constraints in a single pass.
     Replaces the old NLLB + separate reformulation pipeline.
     """
-    def __init__(self, model_name="Qwen/Qwen3-8B"):
+    def __init__(self, model_name="Qwen/Qwen3.5-8B-Instruct"):
         self.model_name = model_name
         self.model = None
         self.tokenizer = None
