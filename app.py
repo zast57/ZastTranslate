@@ -363,6 +363,14 @@ def step6_synthesize(voice_mode, voice_file, never_cut, progress=gr.Progress()):
     
     progress(0.05, "Initializing TTS & Sync...")
     
+    # Check if we need to separate background audio (e.g. if skipped via SRT import)
+    if state.video_info and 'background' not in state.video_info:
+        progress(0.05, "Separating background audio (was skipped)...")
+        stems = separator.separate(state.video_info['audio_44k'])
+        state.video_info['vocals'] = stems['vocals']
+        state.video_info['background'] = stems['background']
+        separator.cleanup()
+    
     # Determine voice path based on mode
     voice_path = None
     if voice_mode == "Clone from original" and state.video_info and 'vocals' in state.video_info:
@@ -493,6 +501,14 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
     
     # Detect source language from transcription
     source_lang = state.video_info.get('detected_language', 'en') if state.video_info else 'en'
+    
+    # Check if we need to separate background audio (e.g. if skipped via SRT import)
+    if state.video_info and 'background' not in state.video_info:
+        yield "Separating background audio (was skipped)...", output_files
+        stems = separator.separate(state.video_info['audio_44k'])
+        state.video_info['vocals'] = stems['vocals']
+        state.video_info['background'] = stems['background']
+        separator.cleanup()
     
     for idx, target_lang in enumerate(target_langs):
         # Progress math setup
