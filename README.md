@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 0.97
+# ZastTranslate — Beta 0.98
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ⚠️ **Beta 0.97**: This software is under active development. Tested on **Windows only**. Some features may change.
+> ⚠️ **Beta 0.98**: This software is under active development. Tested on **Windows only**. Some features may change.
 
 Translate any video into 10 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -129,6 +129,24 @@ Automate the translation and dubbing process for multiple languages down to a si
 
 ![Bulk Mode Translated Output](bulk2.jpeg)
 
+### 🔴 Publish to YouTube (Bulk Mode only) — *OPTIONAL FEATURE*
+
+ZastTranslate can automatically upload your generated translations and subtitles directly to your YouTube channel! **This feature is 100% optional. If you do not configure it, the application will continue to generate your files locally without any issue.**
+
+If you want to automate the upload process, you must use the "Bring Your Own Key" method:
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project and enable the **YouTube Data API v3**.
+3. Configure the "OAuth consent screen" (Testing mode is fine, be sure to add your own Google email address in the 'Test users' section).
+4. Create **OAuth 2.0 Client IDs** (Application type: Desktop app).
+5. Download the JSON file and rename it exactly to `client_secret.json`.
+6. Place `client_secret.json` directly into your `ZastTranslate` folder.
+
+**How to use it:**
+Once configured, whenever you import a video using a YouTube URL, the **Bulk Mode** tab will display a red "Publish Metadata & Subtitles to YouTube" button. 
+Clicking it will open a secure browser window asking you to authorize the application (you only need to do this once). It will then automatically update your video's localized titles, descriptions, and upload the translated `.srt` files as subtitle tracks.
+
+> ⚠️ **Note on Audio:** YouTube's API does not currently support uploading dubbed audio tracks (Multi-language Audio). You will still need to drag and drop the generated `.wav` files manually in the YouTube Studio interface.
+
 ### ℹ️ Help tab
 
 The built-in Help tab provides detailed usage instructions, troubleshooting tips, and system information.
@@ -220,6 +238,9 @@ MIT
 
 ## History
 
+- **Version 0.98**
+  - **YouTube API Integration (Optional)**: Added a "Publish to YouTube" button in Bulk Mode. By bringing your own `client_secret.json` from Google Cloud, ZastTranslate can now automatically push localized titles, descriptions, and subtitle tracks directly to your video.
+  - **Auto-Fill Metadata**: In Bulk Mode, the Original Title and Description fields can now be populated automatically from the imported YouTube URL with a single click.
 - **Version 0.97**
   - **Memory Optimization**: Added a "Keep models in memory" option for users with high VRAM (>16GB) to bypass unloading models between steps, dramatically speeding up workflows.
   - **Speed Acceleration**: Implemented native PyTorch SDPA (Scaled Dot Product Attention) for Qwen2.5-7B and Qwen3-TTS. This speeds up LLM and voice generation without complex compilation.

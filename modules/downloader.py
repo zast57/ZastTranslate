@@ -29,6 +29,7 @@ class VideoDownloader:
                     "title": info.get('title', 'Unknown'),
                     "description": info.get('description', ''),
                     "duration": info.get('duration', 0),
+                    "youtube_id": info.get('id', None),
                     "resolutions": resolutions,
                 }
         except Exception as e:
@@ -64,7 +65,7 @@ class VideoDownloader:
                     base, _ = os.path.splitext(video_filename)
                     video_filename = base + '.' + ydl_opts['merge_output_format']
                 
-                return self._process_video(video_filename, info.get('title', 'video'), info.get('description', ''))
+                return self._process_video(video_filename, info.get('title', 'video'), info.get('description', ''), info.get('id', None))
         except Exception as e:
             print(f"yt-dlp download error: {e}")
             raise
@@ -76,9 +77,9 @@ class VideoDownloader:
         filename = os.path.basename(filepath)
         dest_path = os.path.join(TEMP_DIR, filename)
         shutil.copy2(filepath, dest_path)
-        return self._process_video(dest_path, os.path.splitext(filename)[0], "")
+        return self._process_video(dest_path, os.path.splitext(filename)[0], "", None)
 
-    def _process_video(self, video_path, title, description=""):
+    def _process_video(self, video_path, title, description="", youtube_id=None):
         """
         Extract audio and return file info.
         """
@@ -91,7 +92,8 @@ class VideoDownloader:
             "audio_44k": audio_paths["audio_44k"],
             "duration": duration,
             "title": title,
-            "description": description
+            "description": description,
+            "youtube_id": youtube_id
         }
 
     def extract_audio(self, video_path):

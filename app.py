@@ -14,7 +14,9 @@ from modules.tts_engine import TTSEngine
 from modules.time_sync import TimeSync
 from modules.audio_mixer import AudioMixer
 from modules.video_assembler import VideoAssembler
+from modules.video_assembler import VideoAssembler
 from modules.srt_parser import SRTParser
+from modules.youtube_publisher import YouTubePublisher
 
 # --- HELPERS ---
 
@@ -59,6 +61,7 @@ time_sync = TimeSync(tts_engine, reformulator)
 audio_mixer = AudioMixer()
 video_assembler = VideoAssembler()
 srt_parser = SRTParser()
+youtube_publisher = YouTubePublisher(BASE_DIR)
 
 # --- UI FUNCTIONS ---
 
@@ -83,6 +86,8 @@ def reset_project():
         gr.Button(interactive=False),  # btn_synth
         gr.Button(interactive=False),  # btn_bulk_run
         gr.update(visible=False),      # btn_import_metadata
+        gr.update(visible=False),      # btn_youtube_publish
+        gr.update(visible=False, value="") # bulk_publish_status
     )
 
 
@@ -118,9 +123,16 @@ def step1_download(url, local_file, resolution, progress=gr.Progress()):
             raise ValueError("Please provide a YouTube URL or a local file.")
         
         state.video_info = info
-        return f"Video loaded: {info['title']}", info['video_path'], gr.Button(interactive=True), show_btn
+        if info.get('youtube_id'):
+            show_publish_btn = gr.update(visible=True)
+            show_publish_status = gr.update(visible=True, value="")
+        else:
+            show_publish_btn = gr.update(visible=False)
+            show_publish_status = gr.update(visible=False)
+
+        return f"Video loaded: {info['title']}", info['video_path'], gr.Button(interactive=True), show_btn, show_publish_btn, show_publish_status
     except Exception as e:
-        return f"Error: {str(e)}", None, gr.Button(interactive=False), gr.update(visible=False)
+        return f"Error: {str(e)}", None, gr.Button(interactive=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
 
 
 
@@ -521,6 +533,7 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
     output_files = []
     metadata_display = ""
     total_langs = len(target_langs)
+    state.bulk_results = {'localizations': {}, 'srts': {}}
     
     # Detect source language from transcription
     source_lang = state.video_info.get('detected_language', 'en') if state.video_info else 'en'
@@ -563,6 +576,13 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
             
             meta_text = f"### {target_lang} Metadata\n\n**Title:**\n```text\n{translated_title}\n```\n\n**Description:**\n```text\n{translated_desc}\n```\n\n---\n"
             metadata_display += meta_text
+            
+            # Store for YouTube Publishing
+            state.bulk_results['localizations'][target_lang_code] = {
+                'title': translated_title,
+                'description': translated_desc
+            }
+            
             yield f"[{idx+1}/{total_langs}] TRANSLATION PHASE: {target_lang}...", output_files, metadata_display
         
         progress(base_progress + prog_step * 0.2, f"[{target_lang}] Fitted translation...")
@@ -597,6 +617,9 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         fitted_srt = os.path.join(TEMP_DIR, f"fitted_{iso}.srt")
         srt_parser.segments_to_srt(translated, fitted_srt, text_key="translated_text")
         output_files.append(fitted_srt)
+        
+        # Store SRT path for YouTube Publishing (We prefer natural translation for subtitles)
+        state.bulk_results['srts'][target_lang_code] = trans_srt
 
         # Store for the synthesis phase
         import copy
@@ -700,6 +723,37 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
     yield f"Completed! Processed {total_langs} languages.", output_files, metadata_display
 
 
+
+def step6_publish_youtube(progress=gr.Progress()):
+    if not state.video_info or not state.video_info.get('youtube_id'):
+        return "Error: No YouTube video ID found. Please import from a YouTube URL first."
+    
+    if not youtube_publisher.is_configured():
+        return "Error: client_secret.json is missing. Please place it in the application folder."
+        
+    try:
+        progress(0, "Authenticating with YouTube API...")
+        youtube_publisher.authenticate()
+        
+        video_id = state.video_info['youtube_id']
+        localizations = state.bulk_results.get('localizations', {})
+        srts = state.bulk_results.get('srts', {})
+        
+        if localizations:
+            progress(0.3, "Updating video metadata (Title & Description)...")
+            youtube_publisher.update_metadata(video_id, localizations)
+            
+        progress_per_lang = 0.6 / max(1, len(srts))
+        for idx, (lang_code, srt_path) in enumerate(srts.items()):
+            progress(0.4 + idx * progress_per_lang, f"Uploading {lang_code} subtitles...")
+            if os.path.exists(srt_path):
+                # Name the caption track after the language code
+                youtube_publisher.upload_caption(video_id, lang_code, f"{lang_code} Subtitles", srt_path)
+                
+        return "✅ Published Metadata and Subtitles successfully to YouTube!"
+    except Exception as e:
+        return f"❌ YouTube API Error: {str(e)}"
+
 # --- GRADIO INTERFACE ---
 
 with gr.Blocks(title="ZastTranslate") as app:
@@ -711,7 +765,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         with open(_logo_path, "rb") as _f:
             _logo_b64 = _b64.b64encode(_f.read()).decode()
         _logo_html = f"<center><img src='data:image/png;base64,{_logo_b64}' width='80' /></center>\n\n"
-    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 0.97\n**Offline video translation & dubbing (No Lip-Sync)**")
+    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 0.98\n**Offline video translation & dubbing (No Lip-Sync)**")
     
     with gr.Tab("1. Import"):
         url_input = gr.Textbox(label="YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
@@ -844,6 +898,10 @@ with gr.Blocks(title="ZastTranslate") as app:
         bulk_status_output = gr.Textbox(label="Status", interactive=False)
         bulk_metadata_output = gr.Markdown(label="Translated Metadata")
         bulk_files_output = gr.File(label="Generated Files Output", file_count="multiple")
+        
+        with gr.Row():
+            btn_youtube_publish = gr.Button("🔴 Publish Metadata & Subtitles to YouTube", variant="primary", visible=False)
+            bulk_publish_status = gr.Textbox(label="Publish Status", interactive=False, visible=False)
 
     with gr.Tab("ℹ️ Help"):
         gr.Markdown("## How to use ZastTranslate")
@@ -969,8 +1027,8 @@ with gr.Blocks(title="ZastTranslate") as app:
 
     # EVENTS
     btn_check.click(step0_check_url, [url_input], [status_dl, yt_resolution, btn_dl])
-    btn_dl.click(step1_download, [url_input, file_input, yt_resolution], [status_dl, video_preview, btn_transcribe, btn_import_metadata])
-    btn_reset.click(reset_project, [], [url_input, file_input, status_dl, video_preview, btn_transcribe, btn_translate, btn_synth, btn_bulk_run, btn_import_metadata])
+    btn_dl.click(step1_download, [url_input, file_input, yt_resolution], [status_dl, video_preview, btn_transcribe, btn_import_metadata, btn_youtube_publish, bulk_publish_status])
+    btn_reset.click(reset_project, [], [url_input, file_input, status_dl, video_preview, btn_transcribe, btn_translate, btn_synth, btn_bulk_run, btn_import_metadata, btn_youtube_publish, bulk_publish_status])
     
     btn_transcribe.click(step2_transcribe, [lang_source, model_size], [transcription_status, transcription_df])
     btn_import_srt.click(step2b_import_srt, [srt_file_input, lang_source], [transcription_status, transcription_df])
@@ -1008,6 +1066,8 @@ with gr.Blocks(title="ZastTranslate") as app:
         [bulk_target_langs, bulk_voice_mode, bulk_voice_file, bulk_never_cut_mode, bulk_output_type, bulk_title_input, bulk_desc_input], 
         [bulk_status_output, bulk_files_output, bulk_metadata_output]
     )
+    
+    btn_youtube_publish.click(step6_publish_youtube, [], [bulk_publish_status])
 
 if __name__ == "__main__":
     app.launch(
