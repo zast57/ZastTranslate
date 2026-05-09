@@ -3,7 +3,7 @@ import torch
 
 # Nom du projet
 APP_NAME = "ZastTranslate"
-APP_VERSION = "0.9-beta"
+APP_VERSION = "0.99"
 
 # Chemins
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -72,4 +72,13 @@ LANGUAGES = {
     "Korean": "kor_Hang",
     "Chinese (Simplifie)": "zho_Hans",
     "Russian": "rus_Cyrl",
+    "Arabic": "arb_Arab",
+    "Hindi": "hin_Deva",
+    "Dutch": "nld_Latn",
+    "Polish": "pol_Latn",
+    "Turkish": "tur_Latn",
+    "Swedish": "swe_Latn",
+    "Czech": "ces_Latn",
+    "Romanian": "ron_Latn",
+    "Hungarian": "hun_Latn",
 }

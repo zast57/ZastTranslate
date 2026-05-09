@@ -10,7 +10,8 @@ from modules.separator import VocalSeparator
 from modules.transcriber import Transcriber
 from modules.translator import Translator
 from modules.reformulator import Reformulator
-from modules.tts_engine import TTSEngine
+from modules.tts_backends.factory import get_backend as get_tts_backend, get_available_backends as get_available_tts_backends
+from modules.llm_backends.factory import get_backend as get_llm_backend, get_available_backends as get_available_llm_backends
 from modules.time_sync import TimeSync
 from modules.audio_mixer import AudioMixer
 from modules.video_assembler import VideoAssembler
@@ -25,7 +26,10 @@ _NLLB_TO_ISO = {
     "fra_Latn": "FR", "eng_Latn": "EN", "spa_Latn": "ES",
     "deu_Latn": "DE", "ita_Latn": "IT", "por_Latn": "PT",
     "jpn_Jpan": "JA", "kor_Hang": "KO", "zho_Hans": "ZH",
-    "rus_Cyrl": "RU",
+    "rus_Cyrl": "RU", "arb_Arab": "AR", "hin_Deva": "HI",
+    "nld_Latn": "NL", "pol_Latn": "PL", "tur_Latn": "TR",
+    "swe_Latn": "SV", "ces_Latn": "CS", "ron_Latn": "RO",
+    "hun_Latn": "HU"
 }
 
 def _get_iso_code(lang_code):
@@ -56,7 +60,37 @@ separator = VocalSeparator()
 transcriber = Transcriber()
 translator = Translator()
 reformulator = Reformulator()
-tts_engine = TTSEngine()
+
+# TTS Backend Initialization
+def load_config():
+    config_path = os.path.expanduser("~/.zasttranslate/config.json")
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_config(config_data):
+    config_path = os.path.expanduser("~/.zasttranslate/config.json")
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    with open(config_path, "w") as f:
+        json.dump(config_data, f)
+
+user_config = load_config()
+current_tts_backend = user_config.get("tts_backend", "Qwen3-TTS")
+current_llm_backend = user_config.get("llm_backend", "Qwen2.5-7B-Instruct")
+
+available_tts_backends = get_available_tts_backends()
+available_llm_backends = get_available_llm_backends()
+
+if current_tts_backend not in available_tts_backends:
+    current_tts_backend = "Qwen3-TTS"
+if current_llm_backend not in available_llm_backends:
+    current_llm_backend = "Qwen2.5-7B-Instruct"
+
+tts_engine = get_tts_backend(current_tts_backend)
+# Reformulator will load the LLM internally using its backend_name
+reformulator = Reformulator(backend_name=current_llm_backend)
+
 time_sync = TimeSync(tts_engine, reformulator)
 audio_mixer = AudioMixer()
 video_assembler = VideoAssembler()
@@ -775,6 +809,12 @@ with gr.Blocks(title="ZastTranslate") as app:
                 ["1080p"], label="Resolution", value="1080p",
                 interactive=False, info="Click 'Check URL' to see available resolutions"
             )
+            tts_backend_dropdown = gr.Dropdown(
+                choices=list(available_tts_backends.keys()),
+                value=current_tts_backend,
+                label="Modèle TTS (Voix)",
+                interactive=True
+            )
         file_input = gr.File(label="Or upload a local video file", file_types=[".mp4", ".mkv", ".avi", ".mov", ".webm"])
         with gr.Row():
             btn_dl = gr.Button("Import Video", variant="primary")
@@ -791,6 +831,12 @@ with gr.Blocks(title="ZastTranslate") as app:
                 label="Source Language", value="Auto"
             )
             model_size = gr.Dropdown(["base", "small", "medium", "large-v3"], label="Whisper Model", value="base")
+            llm_backend_dropdown = gr.Dropdown(
+                choices=list(available_llm_backends.keys()),
+                value=current_llm_backend,
+                label="Modèle LLM (Traduction)",
+                interactive=True
+            )
 
         
         with gr.Row():
@@ -1068,6 +1114,69 @@ with gr.Blocks(title="ZastTranslate") as app:
     )
     
     btn_youtube_publish.click(step6_publish_youtube, [], [bulk_publish_status])
+
+    # Backend Change Logic
+    def update_language_dropdowns():
+        tts_engine_temp = get_tts_backend(current_tts_backend)
+        llm_engine_temp = get_llm_backend(current_llm_backend)
+        
+        tts_langs = tts_engine_temp.capabilities.get("languages", [])
+        llm_langs = llm_engine_temp.capabilities.get("languages", [])
+        
+        valid_lang_choices = []
+        for display_name, iso in LANGUAGES.items():
+            short_code = _get_iso_code(iso).lower()
+            
+            tts_ok = (tts_langs == "all") or (short_code in tts_langs)
+            llm_ok = (llm_langs == "all") or (short_code in llm_langs)
+            
+            if tts_ok and llm_ok:
+                valid_lang_choices.append(display_name)
+                
+        if not valid_lang_choices:
+            valid_lang_choices = list(LANGUAGES.keys())
+            
+        new_lang_value = valid_lang_choices[0] if valid_lang_choices else None
+        
+        return (
+            gr.update(choices=valid_lang_choices, value=new_lang_value),
+            gr.update(choices=valid_lang_choices, value=[new_lang_value] if new_lang_value else [])
+        )
+        
+    def on_tts_backend_change(selected_name):
+        global tts_engine, current_tts_backend
+        current_tts_backend = selected_name
+        user_config["tts_backend"] = current_tts_backend
+        save_config(user_config)
+        
+        # Switch backend
+        tts_engine = get_tts_backend(current_tts_backend)
+        time_sync.tts = tts_engine
+        
+        return update_language_dropdowns()
+        
+    def on_llm_backend_change(selected_name):
+        global current_llm_backend
+        current_llm_backend = selected_name
+        user_config["llm_backend"] = current_llm_backend
+        save_config(user_config)
+        
+        # Switch backend for reformulator
+        reformulator.backend_name = current_llm_backend
+        
+        return update_language_dropdowns()
+        
+    tts_backend_dropdown.change(
+        on_tts_backend_change,
+        [tts_backend_dropdown],
+        [lang_target, bulk_target_langs]
+    )
+    
+    llm_backend_dropdown.change(
+        on_llm_backend_change,
+        [llm_backend_dropdown],
+        [lang_target, bulk_target_langs]
+    )
 
 if __name__ == "__main__":
     app.launch(

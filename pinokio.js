@@ -1,6 +1,6 @@
 module.exports = {
   version: "5.0",
-  title: "ZastTranslate — Beta 0.98",
+  title: "ZastTranslate — Beta 0.99",
   description: "Video translation & dubbing with voice cloning — 100% local, zero API. 10 languages, AI dubbing.",
   icon: "zastttranslate.png",
   menu: async (kernel, info) => {

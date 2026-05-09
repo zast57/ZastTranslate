@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 0.98
+# ZastTranslate — Beta 0.99
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ⚠️ **Beta 0.98**: This software is under active development. Tested on **Windows only**. Some features may change.
+> ⚠️ **Beta 0.99**: This software is under active development. Tested on **Windows only**. Some features may change.
 
 Translate any video into 10 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -14,8 +14,9 @@ Translate any video into 10 languages with natural-sounding dubbed audio. Option
 
 - 🎬 **Input**: YouTube URL (with resolution picker) or local video file
 - 🎙️ **Transcription**: WhisperX with word-level timestamps — 20+ source languages
-- 🌍 **Translation**: Qwen2.5-7B-Instruct LLM — 10 target languages (limited to Qwen3-TTS dubbing support)
-- 🗣️ **Voice Cloning**: Qwen3-TTS zero-shot voice cloning from original audio or uploaded sample
+- 🌍 **Multi-Backend Translation**: Choose between Qwen2.5-7B, Qwen3.5-9B, or EuroLLM-9B
+- 🗣️ **Modular TTS Architecture**: Powered by Qwen3-TTS and VoxCPM 2, with a dynamic factory ready to accept future engines (like OmniVoice).
+- 🎙️ **Voice Cloning**: Zero-shot voice cloning from original audio or uploaded sample
 - 🔊 **Smart Dubbing**: Auto-adjusts text length & speech speed to match original timing
 - 🎵 **Audio Separation**: Demucs isolates vocals from background music/FX, then remixes with dubbed voice
 - 🚀 **Bulk Mode**: Translate, dub, and export to multiple languages automatically in one single click
@@ -80,15 +81,11 @@ Both columns are editable. The **Fitted** column is what will be spoken during d
 
 **Export options:** Export Translation SRT (full) or Export Fitted SRT (dubbing-ready).
 
-Supported languages (limited to Qwen3-TTS dubbing support):
-
-| Language | Language |
-|---|---|
-| 🇫🇷 Français | 🇯🇵 Japanese |
-| 🇬🇧 English | 🇰🇷 Korean |
-| 🇪🇸 Español | 🇨🇳 Chinese (Simplified) |
-| 🇩🇪 Deutsch | 🇷🇺 Russian |
-| 🇮🇹 Italiano | 🇧🇷 Português |
+**Supported languages:** The dropdown automatically updates based on the **intersection** of the capabilities of the selected **TTS Backend** (Tab 1) and **LLM Backend** (Tab 2).
+For example:
+- **TTS:** Qwen3-TTS supports 10 languages. VoxCPM 2 supports additional languages like Polish and Dutch.
+- **LLM:** Qwen2.5/3.5 support all languages. EuroLLM supports only European languages.
+If you combine EuroLLM (European) with Qwen3-TTS (10 languages), only the European languages common to both will be available.
 
 ### Step 4 — Dubbing & Export
 
@@ -133,13 +130,12 @@ Automate the translation and dubbing process for multiple languages down to a si
 
 ZastTranslate can automatically upload your generated translations and subtitles directly to your YouTube channel! **This feature is 100% optional. If you do not configure it, the application will continue to generate your files locally without any issue.**
 
-If you want to automate the upload process, you must use the "Bring Your Own Key" method:
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project and enable the **YouTube Data API v3**.
-3. Configure the "OAuth consent screen" (Testing mode is fine, be sure to add your own Google email address in the 'Test users' section).
-4. Create **OAuth 2.0 Client IDs** (Application type: Desktop app).
-5. Download the JSON file and rename it exactly to `client_secret.json`.
-6. Place `client_secret.json` directly into your `ZastTranslate` folder.
+**La méthode "Développeur / Bring Your Own Key" (La meilleure pour cet outil) :**
+1. Tu vas sur la console Google Cloud.
+2. Tu actives l'API YouTube gratuitement.
+3. Tu télécharges un petit fichier `client_secret.json` que tu mets dans le dossier de ZastTranslate.
+4. L'application ouvre une page web te demandant : "ZastTranslate veut accéder à ta chaîne, acceptes-tu ?"
+5. Tu cliques sur Oui, et l'appli obtient un jeton d'accès sécurisé.
 
 **How to use it:**
 Once configured, whenever you import a video using a YouTube URL, the **Bulk Mode** tab will display a red "Publish Metadata & Subtitles to YouTube" button. 
@@ -238,6 +234,12 @@ MIT
 
 ## History
 
+- **Version 0.99**
+  - **Multi-Backend TTS Architecture**: Decoupled `tts_engine.py` into a modular `tts_backends/` structure. Currently supports Qwen3-TTS and VoxCPM 2 natively, with an architecture ready to plug in future engines like OmniVoice once Windows support stabilizes.
+  - **Multi-Backend LLM Architecture**: Added `llm_backends/` supporting Qwen2.5-7B, Qwen3.5-9B, and EuroLLM-9B.
+  - **Dynamic Language Intersection**: UI dropdowns automatically filter target languages based on the intersection of the selected TTS and LLM backends' capabilities.
+  - **Memory Efficiency**: Backends are now loaded on-the-fly and cleanly unloaded from VRAM when switching models.
+  - **Dynamic TimeSync**: Subtitle duration adjustments now adapt natively to the backend's specific features (speed instruct injection, native duration passing).
 - **Version 0.98**
   - **YouTube API Integration (Optional)**: Added a "Publish to YouTube" button in Bulk Mode. By bringing your own `client_secret.json` from Google Cloud, ZastTranslate can now automatically push localized titles, descriptions, and subtitle tracks directly to your video.
   - **Auto-Fill Metadata**: In Bulk Mode, the Original Title and Description fields can now be populated automatically from the imported YouTube URL with a single click.

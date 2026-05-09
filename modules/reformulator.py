@@ -1,7 +1,7 @@
 import torch
 import re
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-from modules.utils import cleanup_model
+from config import DEVICE, CHARS_PER_SECOND
+from modules.llm_backends import get_backend
 from config import DEVICE, CHARS_PER_SECOND
 
 class Reformulator:
@@ -10,36 +10,14 @@ class Reformulator:
     Uses Qwen3-8B to translate and fit text to time constraints in a single pass.
     Replaces the old NLLB + separate reformulation pipeline.
     """
-    def __init__(self, model_name="Qwen/Qwen2.5-7B-Instruct"):
-        self.model_name = model_name
-        self.model = None
-        self.tokenizer = None
-        self.device = DEVICE
+    def __init__(self, backend_name="Qwen2.5-7B-Instruct"):
+        self.backend_name = backend_name
+        self.llm = None
 
     def load_model(self):
-        if self.model is None:
-            print(f"Loading Translation LLM ({self.model_name})...")
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            
-            if self.device == "cuda":
-                bnb_config = BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_compute_dtype=torch.float16,
-                    bnb_4bit_quant_type="nf4",
-                )
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    self.model_name,
-                    quantization_config=bnb_config,
-                    device_map="auto",
-                    attn_implementation="sdpa",
-                )
-            else:
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    self.model_name,
-                    torch_dtype=torch.float32,
-                    device_map="cpu",
-                    attn_implementation="sdpa",
-                )
+        if self.llm is None or self.llm.name != self.backend_name:
+            self.llm = get_backend(self.backend_name)
+            self.llm.load()
 
     def _language_name(self, lang_code):
         """Convert language code to human-readable name."""
@@ -69,29 +47,15 @@ class Reformulator:
 
     def _generate(self, messages, max_new_tokens=120, multiline=False):
         """Run LLM generation with standard settings."""
-        text_input = self.tokenizer.apply_chat_template(
+        self.load_model()
+        response = self.llm.generate(
             messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=False,
-        )
-        
-        model_inputs = self.tokenizer([text_input], return_tensors="pt").to(self.device)
-        
-        generated_ids = self.model.generate(
-            model_inputs.input_ids,
             max_new_tokens=max_new_tokens,
             temperature=0.3,
             do_sample=True,
             repetition_penalty=1.05,
+            multiline=multiline
         )
-        
-        generated_ids = [
-            output_ids[len(input_ids):] 
-            for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-        ]
-        
-        response = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
         
         # Strip <think> blocks (Qwen3 reasoning artifacts)
         response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
@@ -410,10 +374,9 @@ Shortened ({target_chars} chars max):"""
         return result if result else ""
 
     def cleanup(self):
-        cleanup_model(self.model)
-        cleanup_model(self.tokenizer)
-        self.model = None
-        self.tokenizer = None
+        if self.llm is not None:
+            self.llm.unload()
+            self.llm = None
 
 if __name__ == "__main__":
     r = Reformulator()
