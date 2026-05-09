@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 0.95
+# ZastTranslate — Beta 0.96
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ⚠️ **Beta 0.95**: This software is under active development. Tested on **Windows only**. Some features may change.
+> ⚠️ **Beta 0.96**: This software is under active development. Tested on **Windows only**. Some features may change.
 
 Translate any video into 10 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -220,6 +220,10 @@ MIT
 
 ## History
 
+- **Version 0.96**
+  - **Improved Formatting**: Metadata output in Bulk Mode is now displayed in convenient copy-paste text blocks.
+  - **Translation Quality**: Fine-tuned the repetition penalty to produce more natural translations.
+  - **Fixed Truncation**: Increased the max token limit for metadata translation to ensure long descriptions are fully translated without being cut off.
 - **Version 0.95**
   - **Memory Optimization**: Completely refactored the Bulk Mode pipeline to process all translations before loading the TTS model, eliminating VRAM fragmentation and massive slowdowns.
   - **Metadata Translation**: Added optional fields in Bulk Mode to automatically translate the Video Title and Description into all target languages.

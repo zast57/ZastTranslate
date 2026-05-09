@@ -550,7 +550,7 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
             if bulk_desc:
                 translated_desc = reformulator.translate_text(bulk_desc, source_lang, target_lang_code)
             
-            meta_text = f"### {target_lang} Metadata\n**Title:** {translated_title}\n\n**Description:** {translated_desc}\n\n---\n"
+            meta_text = f"### {target_lang} Metadata\n\n**Title:**\n```text\n{translated_title}\n```\n\n**Description:**\n```text\n{translated_desc}\n```\n\n---\n"
             metadata_display += meta_text
             yield f"[{idx+1}/{total_langs}] TRANSLATION PHASE: {target_lang}...", output_files, metadata_display
         
@@ -685,7 +685,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         with open(_logo_path, "rb") as _f:
             _logo_b64 = _b64.b64encode(_f.read()).decode()
         _logo_html = f"<center><img src='data:image/png;base64,{_logo_b64}' width='80' /></center>\n\n"
-    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 0.95\n**Offline video translation & dubbing (No Lip-Sync)**")
+    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 0.96\n**Offline video translation & dubbing (No Lip-Sync)**")
     
     with gr.Tab("1. Import"):
         url_input = gr.Textbox(label="YouTube URL", placeholder="https://www.youtube.com/watch?v=...")

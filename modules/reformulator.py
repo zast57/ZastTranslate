@@ -81,7 +81,7 @@ class Reformulator:
             max_new_tokens=max_new_tokens,
             temperature=0.3,
             do_sample=True,
-            repetition_penalty=1.2,
+            repetition_penalty=1.05,
         )
         
         generated_ids = [
@@ -400,7 +400,7 @@ Shortened ({target_chars} chars max):"""
             {"role": "user", "content": prompt}
         ]
         
-        result = self._generate(messages, max_new_tokens=min(500, len(text) * 3))
+        result = self._generate(messages, max_new_tokens=4096)
         return result if result else ""
 
     def cleanup(self):
