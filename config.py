@@ -25,6 +25,12 @@ except Exception:
     GPU_NAME = "Unknown"
     GPU_VRAM = "N/A"
 
+# NVIDIA Ampere+ (RTX 30xx/40xx) Acceleration
+if DEVICE == "cuda":
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    print("NVIDIA TF32 Acceleration Enabled (Massive speedup for RTX 3000/4000+ GPUs)")
+
 # Synchronization constants
 TOLERANCE_TOO_LONG = 0.15    # 150ms: beyond this, adjust speed
 MAX_SPEED_FACTOR = 1.25      # Max native speedup (CustomVoice instruct)

@@ -44,6 +44,7 @@ class AppState:
         self.translated_segments = []
         self.synced_segments = []
         self.temp_dir = TEMP_DIR
+        self.keep_models = False
         
 state = AppState()
 
@@ -81,6 +82,7 @@ def reset_project():
         gr.Button(interactive=False),  # btn_translate
         gr.Button(interactive=False),  # btn_synth
         gr.Button(interactive=False),  # btn_bulk_run
+        gr.update(visible=False),      # btn_import_metadata
     )
 
 
@@ -108,15 +110,17 @@ def step1_download(url, local_file, resolution, progress=gr.Progress()):
     try:
         if url:
             info = downloader.download(url, resolution=resolution)
+            show_btn = gr.update(visible=True)
         elif local_file:
             info = downloader.import_local(local_file)
+            show_btn = gr.update(visible=False)
         else:
             raise ValueError("Please provide a YouTube URL or a local file.")
         
         state.video_info = info
-        return f"Video loaded: {info['title']}", info['video_path'], gr.Button(interactive=True)
+        return f"Video loaded: {info['title']}", info['video_path'], gr.Button(interactive=True), show_btn
     except Exception as e:
-        return f"Error: {str(e)}", None, gr.Button(interactive=False)
+        return f"Error: {str(e)}", None, gr.Button(interactive=False), gr.update(visible=False)
 
 
 
@@ -128,7 +132,8 @@ def step2_transcribe(lang_source, model_size, progress=gr.Progress()):
     stems = separator.separate(state.video_info['audio_44k'])
     state.video_info['vocals'] = stems['vocals']
     state.video_info['background'] = stems['background']
-    separator.cleanup()
+    if not state.keep_models:
+        separator.cleanup()
     
     progress(0.4, "Transcribing with WhisperX...")
     # Map display names to WhisperX language codes
@@ -148,7 +153,8 @@ def step2_transcribe(lang_source, model_size, progress=gr.Progress()):
     )
     state.segments = res['segments']
     state.video_info['detected_language'] = res['language']
-    transcriber.cleanup()
+    if not state.keep_models:
+        transcriber.cleanup()
     
     # Prepare dataframe for editor
     data = []
@@ -290,7 +296,8 @@ def step4_translate(target_lang, progress=gr.Progress()):
     progress(0.6, "Phase 3/3: Natural full translation...")
     reformulator.translate_normal(state.translated_segments, source_lang, target_lang_code)
     
-    reformulator.cleanup()
+    if not state.keep_models:
+        reformulator.cleanup()
     
     # Build Dataframe with 5 columns: Start, End, Original, Translation (normal), Fitted
     data = []
@@ -381,7 +388,8 @@ def step6_synthesize(voice_mode, voice_file, never_cut, progress=gr.Progress()):
         stems = separator.separate(state.video_info['audio_44k'])
         state.video_info['vocals'] = stems['vocals']
         state.video_info['background'] = stems['background']
-        separator.cleanup()
+        if not state.keep_models:
+            separator.cleanup()
     
     # Determine voice path based on mode
     voice_path = None
@@ -412,7 +420,8 @@ def step6_synthesize(voice_mode, voice_file, never_cut, progress=gr.Progress()):
             state.video_info['duration'], voice_mapping=None
         )
         state.synced_segments = synced
-        tts_engine.cleanup()
+        if not state.keep_models:
+            tts_engine.cleanup()
         
         # Assembly with real (cascade) positions
         progress(0.8, "[Never Cut] Assembling with cascade placement...")
@@ -445,7 +454,8 @@ def step6_synthesize(voice_mode, voice_file, never_cut, progress=gr.Progress()):
             total_duration=state.video_info.get('duration')
         )
         
-        tts_engine.cleanup()
+        if not state.keep_models:
+            tts_engine.cleanup()
         
         # Assembly
         progress(0.8, "Mixing audio...")
@@ -521,7 +531,8 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         stems = separator.separate(state.video_info['audio_44k'])
         state.video_info['vocals'] = stems['vocals']
         state.video_info['background'] = stems['background']
-        separator.cleanup()
+        if not state.keep_models:
+            separator.cleanup()
     
     # Phase 1: Translate ALL languages first to prevent VRAM fragmentation
     all_translated_segments = {}
@@ -592,7 +603,8 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         all_translated_segments[target_lang] = copy.deepcopy(translated)
 
     # CRITICAL: Clean up LLM from VRAM completely before loading TTS
-    reformulator.cleanup()
+    if not state.keep_models:
+        reformulator.cleanup()
     
     # Phase 2: Synthesize ALL languages
     # Determine voice path ONCE before loading model
@@ -670,7 +682,21 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
             )
             output_files.append(final_video)
             
-    tts_engine.cleanup()
+    if not state.keep_models:
+        tts_engine.cleanup()
+    
+    # Create a ZIP archive of all outputs for easy download
+    import zipfile
+    zip_path = os.path.join(OUTPUT_DIR, "bulk_export_all.zip")
+    try:
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for f in output_files:
+                if os.path.exists(f):
+                    zipf.write(f, os.path.basename(f))
+        output_files.insert(0, zip_path)
+    except Exception as e:
+        print(f"Failed to create ZIP: {e}")
+
     yield f"Completed! Processed {total_langs} languages.", output_files, metadata_display
 
 
@@ -685,7 +711,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         with open(_logo_path, "rb") as _f:
             _logo_b64 = _b64.b64encode(_f.read()).decode()
         _logo_html = f"<center><img src='data:image/png;base64,{_logo_b64}' width='80' /></center>\n\n"
-    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 0.96\n**Offline video translation & dubbing (No Lip-Sync)**")
+    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 0.97\n**Offline video translation & dubbing (No Lip-Sync)**")
     
     with gr.Tab("1. Import"):
         url_input = gr.Textbox(label="YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
@@ -786,8 +812,11 @@ with gr.Blocks(title="ZastTranslate") as app:
         )
         
         with gr.Row():
-            bulk_title_input = gr.Textbox(label="Original Video Title (Optional)", placeholder="Title...")
-            bulk_desc_input = gr.Textbox(label="Original Video Description (Optional)", placeholder="Description...", lines=3)
+            with gr.Column(scale=4):
+                bulk_title_input = gr.Textbox(label="Original Video Title (Optional)", placeholder="Title...")
+                bulk_desc_input = gr.Textbox(label="Original Video Description (Optional)", placeholder="Description...", lines=3)
+            with gr.Column(scale=1):
+                btn_import_metadata = gr.Button("⬇️ Import from URL", variant="secondary", visible=False)
         
         with gr.Row():
             bulk_voice_mode = gr.Radio(
@@ -914,6 +943,13 @@ with gr.Blocks(title="ZastTranslate") as app:
                 "from the Gradio server. Does not affect the application."
             )
         
+        with gr.Accordion("🧠 System & VRAM Settings", open=False):
+            keep_models_ui = gr.Checkbox(
+                label="Keep models in memory (Fast Mode, requires >16GB VRAM)", 
+                value=False,
+                info="If checked, AI models are not unloaded between steps. Dramatically speeds up bulk processing, but requires high VRAM."
+            )
+            
         with gr.Accordion("⚙️ System requirements", open=False):
             gr.Markdown(
                 "- **GPU**: NVIDIA GPU with 4+ GB VRAM recommended (CUDA)\n"
@@ -933,8 +969,8 @@ with gr.Blocks(title="ZastTranslate") as app:
 
     # EVENTS
     btn_check.click(step0_check_url, [url_input], [status_dl, yt_resolution, btn_dl])
-    btn_dl.click(step1_download, [url_input, file_input, yt_resolution], [status_dl, video_preview, btn_transcribe])
-    btn_reset.click(reset_project, [], [url_input, file_input, status_dl, video_preview, btn_transcribe, btn_translate, btn_synth, btn_bulk_run])
+    btn_dl.click(step1_download, [url_input, file_input, yt_resolution], [status_dl, video_preview, btn_transcribe, btn_import_metadata])
+    btn_reset.click(reset_project, [], [url_input, file_input, status_dl, video_preview, btn_transcribe, btn_translate, btn_synth, btn_bulk_run, btn_import_metadata])
     
     btn_transcribe.click(step2_transcribe, [lang_source, model_size], [transcription_status, transcription_df])
     btn_import_srt.click(step2b_import_srt, [srt_file_input, lang_source], [transcription_status, transcription_df])
@@ -955,6 +991,14 @@ with gr.Blocks(title="ZastTranslate") as app:
     
     never_cut_mode.change(toggle_never_cut_warning, [never_cut_mode], [never_cut_warning])
     bulk_never_cut_mode.change(toggle_never_cut_warning, [bulk_never_cut_mode], [bulk_never_cut_warning])
+    
+    keep_models_ui.change(lambda x: setattr(state, 'keep_models', x), inputs=[keep_models_ui], outputs=[])
+    
+    def import_metadata_from_state():
+        if state.video_info:
+            return state.video_info.get('title', ''), state.video_info.get('description', '')
+        return "", ""
+    btn_import_metadata.click(import_metadata_from_state, [], [bulk_title_input, bulk_desc_input])
     
     btn_synth.click(step6_synthesize, [voice_mode, voice_file, never_cut_mode], [synth_status, final_video_out, final_audio_out])
     btn_export_audio.click(export_audio, [], [synth_status, export_audio_file])

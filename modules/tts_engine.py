@@ -39,7 +39,6 @@ class TTSEngine:
                 "dtype": torch.bfloat16 if self.device == "cuda" else torch.float32,
             }
             
-            # Try with flash_attention_2 first, fallback to default
             try:
                 self.model = Qwen3TTSModel.from_pretrained(
                     model_id, **load_kwargs,
@@ -47,10 +46,17 @@ class TTSEngine:
                 )
                 print(f"Qwen3-TTS loaded with FlashAttention 2.")
             except Exception:
-                self.model = Qwen3TTSModel.from_pretrained(
-                    model_id, **load_kwargs,
-                )
-                print(f"Qwen3-TTS loaded (without FlashAttention).")
+                try:
+                    self.model = Qwen3TTSModel.from_pretrained(
+                        model_id, **load_kwargs,
+                        attn_implementation="sdpa",
+                    )
+                    print(f"Qwen3-TTS loaded with SDPA (Fast Attention).")
+                except Exception:
+                    self.model = Qwen3TTSModel.from_pretrained(
+                        model_id, **load_kwargs,
+                    )
+                    print(f"Qwen3-TTS loaded (Standard Attention).")
             
             self.engine = "qwen3-tts-clone" if "Base" in model_id else "qwen3-tts-custom"
             

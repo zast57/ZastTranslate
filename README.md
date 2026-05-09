@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 0.96
+# ZastTranslate — Beta 0.97
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ⚠️ **Beta 0.96**: This software is under active development. Tested on **Windows only**. Some features may change.
+> ⚠️ **Beta 0.97**: This software is under active development. Tested on **Windows only**. Some features may change.
 
 Translate any video into 10 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -125,9 +125,9 @@ Automate the translation and dubbing process for multiple languages down to a si
 
 > ⚡ **Memory Optimized**: In Bulk Mode, the pipeline translates ALL languages first, completely unloads the LLM, and then loads the Voice Synthesis AI. This prevents VRAM fragmentation and allows you to run massive multi-language batches efficiently even on an RTX 4090.
 
-![Bulk Mode Settings](bulk.jpg)
+![Bulk Mode Original Title & Description](bulk1.jpeg)
 
-![Bulk Mode Processing](bulk2.jpg)
+![Bulk Mode Translated Output](bulk2.jpeg)
 
 ### ℹ️ Help tab
 
@@ -220,6 +220,10 @@ MIT
 
 ## History
 
+- **Version 0.97**
+  - **Memory Optimization**: Added a "Keep models in memory" option for users with high VRAM (>16GB) to bypass unloading models between steps, dramatically speeding up workflows.
+  - **Speed Acceleration**: Implemented native PyTorch SDPA (Scaled Dot Product Attention) for Qwen2.5-7B and Qwen3-TTS. This speeds up LLM and voice generation without complex compilation.
+  - **Bug Fix**: Resolved a bug during SRT import where an "Auto" source language could incorrectly bypass English translations.
 - **Version 0.96**
   - **Improved Formatting**: Metadata output in Bulk Mode is now displayed in convenient copy-paste text blocks.
   - **Translation Quality**: Fine-tuned the repetition penalty to produce more natural translations.

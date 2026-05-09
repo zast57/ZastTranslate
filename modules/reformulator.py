@@ -31,12 +31,14 @@ class Reformulator:
                     self.model_name,
                     quantization_config=bnb_config,
                     device_map="auto",
+                    attn_implementation="sdpa",
                 )
             else:
                 self.model = AutoModelForCausalLM.from_pretrained(
                     self.model_name,
                     torch_dtype=torch.float32,
                     device_map="cpu",
+                    attn_implementation="sdpa",
                 )
 
     def _language_name(self, lang_code):
@@ -53,7 +55,7 @@ class Reformulator:
         for prefix, name in name_map.items():
             if lang_code.startswith(prefix):
                 return name
-        return "French"
+        return "Unknown"
 
     def _source_language_name(self, lang_code):
         """Get source language name from Whisper-style codes."""
@@ -63,9 +65,9 @@ class Reformulator:
             "ja": "Japanese", "ko": "Korean", "zh": "Chinese",
             "ru": "Russian",
         }
-        return short_map.get(lang_code, "English")
+        return short_map.get(lang_code, "Unknown")
 
-    def _generate(self, messages, max_new_tokens=120):
+    def _generate(self, messages, max_new_tokens=120, multiline=False):
         """Run LLM generation with standard settings."""
         text_input = self.tokenizer.apply_chat_template(
             messages,
@@ -112,13 +114,16 @@ class Reformulator:
                     lines = lines[1:]
                     break
         
-        # Take first non-empty line, strip quotes
-        result = ''
-        for line in lines:
-            line = line.strip()
-            if line:
-                result = line
-                break
+        if multiline:
+            result = '\n'.join(lines).strip()
+        else:
+            # Take first non-empty line, strip quotes
+            result = ''
+            for line in lines:
+                line = line.strip()
+                if line:
+                    result = line
+                    break
         
         for q in ['"', "'", '\u201c', '\u201d', '\u00ab', '\u00bb']:
             if result.startswith(q) and result.endswith(q):
@@ -131,10 +136,11 @@ class Reformulator:
         while result and result[-1] in _all_quotes:
             result = result[:-1].strip()
         
-        # Strip markdown artifacts that LLM sometimes leaks
-        result = re.sub(r'^[\*]+\s*', '', result)   # leading asterisks
-        result = re.sub(r'\s*[\*]+$', '', result)   # trailing asterisks
-        result = result.replace('**', '').strip()    # bold markers
+        if not multiline:
+            # Strip markdown artifacts that LLM sometimes leaks
+            result = re.sub(r'^[\*]+\s*', '', result)   # leading asterisks
+            result = re.sub(r'\s*[\*]+$', '', result)   # trailing asterisks
+            result = result.replace('**', '').strip()    # bold markers
         
         # Final meta-comment check: if result IS a meta-comment, return empty
         for pat in _META_PATTERNS:
@@ -400,7 +406,7 @@ Shortened ({target_chars} chars max):"""
             {"role": "user", "content": prompt}
         ]
         
-        result = self._generate(messages, max_new_tokens=4096)
+        result = self._generate(messages, max_new_tokens=4096, multiline=True)
         return result if result else ""
 
     def cleanup(self):
