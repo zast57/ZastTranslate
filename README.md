@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Release 1.00
+# ZastTranslate — Beta 1.01
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ℹ️ **Release 1.00**: Major architectural update with multi-backend TTS & LLM support. Tested on **Windows only**. Some features may change.
+> ℹ️ **Beta 1.01**: Per-language CPS calibration for VoxCPM 2 (30 languages), Qwen3-TTS removed. Tested on **Windows only**. Some features may change.
 
 Translate any video into 33 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -15,7 +15,7 @@ Translate any video into 33 languages with natural-sounding dubbed audio. Option
 - 🎬 **Input**: YouTube URL (with resolution picker) or local video file
 - 🎙️ **Transcription**: WhisperX with word-level timestamps — 20+ source languages
 - 🌍 **Multi-Backend Translation**: Choose between Qwen2.5-7B, Qwen3.5-9B, or EuroLLM-9B
-- 🗣️ **Modular TTS Architecture**: Powered by Qwen3-TTS and VoxCPM 2, with a dynamic factory ready to accept future engines (like OmniVoice).
+- 🗣️ **Voice Synthesis**: Powered by **VoxCPM 2** — 30 languages, per-language CPS calibration, with a dynamic factory ready to accept future engines.
 - 🎙️ **Voice Cloning**: Zero-shot voice cloning from original audio or uploaded sample
 - 🔊 **Smart Dubbing**: Auto-adjusts text length & speech speed to match original timing
 - 🎵 **Audio Separation**: Demucs isolates vocals from background music/FX, then remixes with dubbed voice
@@ -33,7 +33,7 @@ Translate any video into 33 languages with natural-sounding dubbed audio. Option
 
 1. Open **Pinokio**
 2. Navigate to this repository
-3. Click **Install** — sets up Python environment, PyTorch CUDA, Qwen3-TTS voice cloning, and all dependencies
+3. Click **Install** — sets up Python environment, PyTorch CUDA, VoxCPM 2 voice cloning, and all dependencies
 4. Click **Start** — launches the Gradio web interface
 
 ## Usage
@@ -83,9 +83,9 @@ Both columns are editable. The **Fitted** column is what will be spoken during d
 
 **Supported languages:** The dropdown automatically updates based on the **intersection** of the capabilities of the selected **TTS Backend** (Tab 1) and **LLM Backend** (Tab 2).
 For example:
-- **TTS:** Qwen3-TTS supports 10 languages. VoxCPM 2 supports 30 languages (Arabic, Burmese, Chinese, Danish, Dutch, English, Finnish, French, German, Greek, Hebrew, Hindi, Indonesian, Italian, Japanese, Khmer, Korean, Lao, Malay, Norwegian, Polish, Portuguese, Russian, Spanish, Swahili, Swedish, Tagalog, Thai, Turkish, Vietnamese).
+- **TTS:** VoxCPM 2 supports 30 languages (Arabic, Burmese, Chinese, Danish, Dutch, English, Finnish, French, German, Greek, Hebrew, Hindi, Indonesian, Italian, Japanese, Khmer, Korean, Lao, Malay, Norwegian, Polish, Portuguese, Russian, Spanish, Swahili, Swedish, Tagalog, Thai, Turkish, Vietnamese).
 - **LLM:** Qwen2.5/3.5 support all languages. EuroLLM supports only European languages.
-If you combine EuroLLM (European) with Qwen3-TTS (10 languages), only the European languages common to both will be available.
+If you combine EuroLLM (European) with VoxCPM 2, only the European languages supported by both will be available.
 
 ### Step 4 — Dubbing & Export
 
@@ -95,11 +95,11 @@ Generate the dubbed video with synthesized speech.
 
 | Mode | Description | When to use |
 |---|---|---|
-| **Default voice** | Qwen3-TTS preset voice | Quick dubbing, no reference needed |
+| **Default voice** | Uses the video's original voice as reference | Quick dubbing without manual sample |
 | **Clone from original** | Clones the speaker's voice from the extracted vocals | Best result — sounds like the original speaker |
 | **Clone from file** | Uses an uploaded WAV/MP3 file as voice reference | When you want a specific voice (10-30s of clear speech) |
 
-> 💡 Voice cloning uses the selected TTS model (Qwen3-TTS or VoxCPM 2), installed automatically during setup.
+> 💡 Voice cloning uses **VoxCPM 2**, installed automatically during setup.
 
 **🔊 Never Cut Vocal** mode speaks all text in full without truncation. Produces more natural speech but dubbing may drift out of sync with the video.
 
@@ -223,7 +223,6 @@ These messages appear in the terminal but **do not affect functionality** and ca
 
 - [WhisperX](https://github.com/m-bain/whisperX) — Speech recognition
 - [Qwen2.5-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct) — Translation & text fitting
-- [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base) — Voice synthesis & cloning
 - [Demucs](https://github.com/facebookresearch/demucs) — Audio source separation
 - [Gradio](https://gradio.app/) — Web interface
 - [Pinokio](https://pinokio.computer/) — 1-click launcher
@@ -234,10 +233,12 @@ MIT
 
 ## History
 
+- **Beta 1.01**
+  - **Per-Language CPS Calibration**: Replaced the single hardcoded 7.5 chars/sec with a per-language table (`fitted_cps_config.py`) covering 30+ languages across Latin, CJK, Cyrillic, Abjad, and Abugida scripts.
+  - **Qwen3-TTS Removed**: VoxCPM 2 is now the sole TTS backend. Simpler stack, fewer dependencies.
 - **Version 1.00**
-  - **Stability & Compatibility**: Fixed Qwen3-TTS loading issues on newest `transformers` versions (RoPE init patch).
   - **Consistent Default Voice**: VoxCPM 2 now automatically uses the video's isolated vocals as its default reference instead of generating random voices.
-  - **Multi-Backend TTS Architecture**: Decoupled `tts_engine.py` into a modular `tts_backends/` structure. Currently supports Qwen3-TTS and VoxCPM 2 natively, with an architecture ready to plug in future engines like OmniVoice once Windows support stabilizes.
+  - **Multi-Backend TTS Architecture**: Decoupled `tts_engine.py` into a modular `tts_backends/` structure. VoxCPM 2 natively supported, with an architecture ready to plug in future engines.
   - **Multi-Backend LLM Architecture**: Added `llm_backends/` supporting Qwen2.5-7B, Qwen3.5-9B, and EuroLLM-9B.
   - **Dynamic Language Intersection**: UI dropdowns automatically filter target languages based on the intersection of the selected TTS and LLM backends' capabilities.
   - **Memory Efficiency**: Backends are now loaded on-the-fly and cleanly unloaded from VRAM when switching models.

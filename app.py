@@ -27,6 +27,7 @@ from modules.video_assembler import VideoAssembler
 from modules.video_assembler import VideoAssembler
 from modules.srt_parser import SRTParser
 from modules.youtube_publisher import YouTubePublisher
+from fitted_cps_config import get_fitted_cps
 
 # --- HELPERS ---
 
@@ -325,10 +326,9 @@ def step4_translate(target_lang, progress=gr.Progress()):
     # Detect source language from transcription
     source_lang = state.video_info.get('detected_language', 'en') if state.video_info else 'en'
     target_lang_code = LANGUAGES.get(target_lang, target_lang)
-    lang_family = time_sync.get_language_family(target_lang_code)
-    cps = CHARS_PER_SECOND.get(lang_family, CHARS_PER_SECOND["default"])
-    # Use TTS backend's calibrated CPS if available (overrides language-family default)
-    cps = tts_engine.capabilities.get("fitted_cps", cps)
+    lang_iso = _get_iso_code(target_lang_code).lower()
+    cps = get_fitted_cps(lang_iso)
+    print(f"[INFO] Using fitted_cps={cps} for target language '{lang_iso}'")
     speed_factor = tts_engine.capabilities.get("fitted_speed_factor", MAX_SPEED_FACTOR)
 
     if state.video_info:
@@ -614,10 +614,9 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         
         target_lang_code = LANGUAGES.get(target_lang, target_lang)
         iso = _get_iso_code(target_lang_code)
-        lang_family = time_sync.get_language_family(target_lang_code)
-        cps = CHARS_PER_SECOND.get(lang_family, CHARS_PER_SECOND["default"])
-        # Use TTS backend's calibrated CPS if available
-        cps = tts_engine.capabilities.get("fitted_cps", cps)
+        lang_iso = iso.lower()
+        cps = get_fitted_cps(lang_iso)
+        print(f"[INFO] Using fitted_cps={cps} for target language '{lang_iso}'")
         speed_factor = tts_engine.capabilities.get("fitted_speed_factor", MAX_SPEED_FACTOR)
 
         if state.video_info:
@@ -850,7 +849,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         with open(_logo_path, "rb") as _f:
             _logo_b64 = _b64.b64encode(_f.read()).decode()
         _logo_html = f"<center><img src='data:image/png;base64,{_logo_b64}' width='80' /></center>\n\n"
-    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 0.98\n**Offline video translation & dubbing (No Lip-Sync)**")
+    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.01\n**Offline video translation & dubbing (No Lip-Sync)**")
     
     with gr.Tab("1. Import"):
         url_input = gr.Textbox(label="YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
@@ -1049,7 +1048,6 @@ with gr.Blocks(title="ZastTranslate") as app:
                 "- **Export Fitted SRT** — Concise dubbing-ready subtitles\n\n"
                 "**Supported languages:** The dropdown dynamically updates based on the intersection of the selected **TTS Backend** and **LLM Backend**.\n"
                 "- **VoxCPM 2** supports 30 languages (Arabic, Burmese, Chinese, Danish, Dutch, English, Finnish, French, German, Greek, Hebrew, Hindi, Indonesian, Italian, Japanese, Khmer, Korean, Lao, Malay, Norwegian, Polish, Portuguese, Russian, Spanish, Swahili, Swedish, Tagalog, Thai, Turkish, Vietnamese).\n"
-                "- **Qwen3-TTS** supports 10 languages (FR, EN, ES, DE, IT, PT, JA, KO, ZH, RU).\n"
                 "- **Qwen2.5/3.5 LLM** support all languages. **EuroLLM** supports only European languages.\n\n"
                 "The available target languages are always the intersection of the TTS engine + LLM capabilities."
             )
@@ -1063,7 +1061,7 @@ with gr.Blocks(title="ZastTranslate") as app:
                 "| **Default voice** | TTS preset voice | Quick dubbing, no reference needed |\n"
                 "| **Clone from original** | Clones the speaker's voice from the extracted vocals | Best result — sounds like the original speaker |\n"
                 "| **Clone from file** | Uses an uploaded WAV/MP3 file as voice reference | When you want a specific voice |\n\n"
-                "💡 Voice cloning uses the selected TTS model (Qwen3-TTS or VoxCPM 2).\n\n"
+                "💡 Voice cloning uses **VoxCPM 2**, installed automatically during setup.\n\n"
                 "**Options:**\n"
                 "- **Voice sample file** — Only needed for *Clone from file* mode. Use 10-30s of clear speech (WAV or MP3).\n"
                 "- **🔊 Never Cut Vocal** — Speaks all text in full without truncation. Produces more natural speech "

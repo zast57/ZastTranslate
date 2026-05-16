@@ -25,8 +25,7 @@ class VoxCPM2Backend(TTSBackend):
             "voice_design": True,
             "vram_gb": 8.0,
             "sample_rate": self._sample_rate or 24000,
-            "fitted_cps": 7.5,          # VoxCPM2 calibrated speaking rate (chars/sec)
-            "fitted_speed_factor": 1.0  # No speed control available
+            "fitted_speed_factor": 1.0  # No speed control available; CPS handled by fitted_cps_config.py
         }
 
     def is_available(self) -> bool:

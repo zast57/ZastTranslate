@@ -5,6 +5,24 @@ import subprocess
 from modules.utils import get_exact_duration, convert_sample_rate
 from config import TEMP_DIR
 
+# Detect available JS runtime once at module load.
+# yt-dlp needs a JS runtime to solve YouTube's n-challenge (format URL decryption).
+# Node.js is bundled with Pinokio; deno is yt-dlp's default but rarely installed.
+_JS_RUNTIME = next((r for r in ('node', 'deno', 'phantomjs') if shutil.which(r)), None)
+if _JS_RUNTIME:
+    print(f"[yt-dlp] JS runtime detected: {_JS_RUNTIME}")
+else:
+    print("[yt-dlp] WARNING: No JS runtime (node/deno) found in PATH. Some YouTube formats may be unavailable.")
+
+
+def _ydl_base_opts() -> dict:
+    """Common yt-dlp options with automatic JS runtime injection."""
+    opts = {}
+    if _JS_RUNTIME:
+        opts['js_runtimes'] = {_JS_RUNTIME: {}}
+    return opts
+
+
 class VideoDownloader:
     def __init__(self):
         os.makedirs(TEMP_DIR, exist_ok=True)
@@ -14,7 +32,11 @@ class VideoDownloader:
         Fetch video info without downloading.
         Returns {"title": str, "duration": float, "resolutions": list[str]}
         """
-        ydl_opts = {'quiet': True, 'noplaylist': True}
+        ydl_opts = {
+            **_ydl_base_opts(),
+            'quiet': True,
+            'noplaylist': True,
+        }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -41,14 +63,15 @@ class VideoDownloader:
         Download video via yt-dlp.
         Returns {"video_path": str, "audio_16k": str, "audio_44k": str, "duration": float, "title": str}
         """
-        # Build yt-dlp format string based on resolution
+        # No container restriction: ffmpeg merges any codec pair into mp4 via merge_output_format
         if resolution == "Best":
-            fmt = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+            fmt = "bestvideo+bestaudio/best"
         else:
             height = resolution.replace("p", "")
-            fmt = f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}][ext=mp4]/best"
+            fmt = f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best"
 
         ydl_opts = {
+            **_ydl_base_opts(),
             'format': fmt,
             'outtmpl': os.path.join(TEMP_DIR, '%(title)s.%(ext)s'),
             'merge_output_format': 'mp4',

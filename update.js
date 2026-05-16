@@ -14,11 +14,20 @@ module.exports = {
                 venv: "env",
                 path: ".",
                 message: [
-                    "pip install -r requirements.txt --upgrade"
+                    "uv pip install -r requirements.txt --upgrade"
                 ]
             }
         },
-        // 3. Ensure correct PyTorch version
+        // 3. Force-update yt-dlp to latest (YouTube API changes frequently)
+        {
+            method: "shell.run",
+            params: {
+                venv: "env",
+                path: ".",
+                message: ["uv pip install -U yt-dlp"]
+            }
+        },
+        // 4. Ensure correct PyTorch version
         {
             method: "script.start",
             params: {
@@ -29,7 +38,7 @@ module.exports = {
                 }
             }
         },
-        // 4. Done
+        // 5. Done
         {
             method: "notify",
             params: {
