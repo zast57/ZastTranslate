@@ -50,6 +50,9 @@ cosyvoice/
 ENVIRONMENT
 4.10.0
 ZastTranslate_SPEC.md
+user_cps_config.json
+dbg_output.txt
+test_qwen_out.txt
 
 # AI agent config files
 AGENTS.md
