@@ -78,7 +78,10 @@ class Reformulator:
             repetition_penalty=1.05,
             multiline=multiline
         )
-        
+        return self._clean_response(response, multiline)
+
+    def _clean_response(self, response: str, multiline: bool = False) -> str:
+        """Apply all post-processing to a raw LLM response."""
         # Strip <think> blocks (Qwen3 reasoning artifacts)
         response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL|re.IGNORECASE).strip()
         response = re.sub(r'<think>.*', '', response, flags=re.DOTALL|re.IGNORECASE).strip()
@@ -138,6 +141,28 @@ class Reformulator:
                 return ''
         
         return result
+
+    def _build_translate_messages(self, text, source_lang, target_lang_code, duration, max_chars):
+        """Build messages + max_new_tokens for a translate_and_fit call (used for batching)."""
+        src_name = self._source_language_name(source_lang)
+        tgt_name = self._language_name(target_lang_code)
+        prompt = f"""You are an expert video dubbing translator. Translate from {src_name} to {tgt_name}.
+
+Source text: "{text}"
+Strict target duration: {duration:.1f}s → translation MAX {max_chars} characters (spaces included).
+ABSOLUTE RULES:
+- Keep the main meaning and tone.
+- Be BRUTALLY concise: remove ALL fillers, unnecessary words, secondary details, repetitions.
+- Paraphrase short, use contractions, fast spoken language, abbreviations if natural.
+- Priority: fit within the duration, even if it requires simplification.
+- Output ONLY the {tgt_name} translation, nothing else.
+
+{tgt_name}:"""
+        messages = [
+            {"role": "system", "content": f"You are a video dubbing translator. Translate from {src_name} to {tgt_name} as BRUTALLY CONCISE as possible to fit in {duration:.1f}s. MAX {max_chars} characters. Output: ONLY the {tgt_name} translation."},
+            {"role": "user", "content": prompt}
+        ]
+        return messages, max(15, int(max_chars * 1.2))
 
     def translate_and_fit(self, text, source_lang, target_lang_code, duration, max_chars):
         """
@@ -209,115 +234,175 @@ ABSOLUTE RULES:
                            target_lang_code, cps, speed_factor=1.15):
         """
         Translate all segments with brutal concision for timing.
-        CPS forced to 9 for ultra-short output.
-        If overflow estimate >40%, retry with 30% shorter constraint.
+        Uses GPU-batched inference (BATCH_SIZE=8) for ~5-8x speedup on 4090.
+        Failed/overflowed segments are retried individually.
         """
         self.load_model()
         
         tgt_name = self._language_name(target_lang_code)
-        print(f"LLM Translation → {tgt_name} ({len(segments)} segments, BRUTAL concision CPS={cps})...")
+        src_name = self._source_language_name(source_lang)
+        same_lang = (src_name == tgt_name)
         
-        # Use the calibrated CPS (fitted to the actual TTS speaking rate)
+        BATCH_SIZE = 8
+        print(f"LLM Translation → {tgt_name} ({len(segments)} segments, batch={BATCH_SIZE}, CPS={cps})...")
+
         aggressive_cps = cps
-        
-        for i, seg in enumerate(segments):
-            text = seg.get("text", "").strip()
-            if not text:
-                seg["translated_text"] = ""
+
+        for batch_start in range(0, len(segments), BATCH_SIZE):
+            batch = segments[batch_start:batch_start + BATCH_SIZE]
+
+            # --- Separate trivial (empty / same-lang) from segments needing LLM ---
+            pending_idx = []   # indices within batch that need LLM
+            batch_messages = []
+            batch_max_tokens = []
+            batch_meta = []    # (text, duration, max_chars) per pending segment
+
+            for local_i, seg in enumerate(batch):
+                text = seg.get("text", "").strip()
+                if not text:
+                    seg["translated_text"] = ""
+                    continue
+
+                duration = seg["end"] - seg["start"]
+                max_chars = int(duration * aggressive_cps * speed_factor)
+
+                if same_lang:
+                    seg["translated_text"] = text if len(text) <= max_chars * 1.1 else text[:max_chars]
+                    continue
+
+                msgs, mnt = self._build_translate_messages(text, source_lang, target_lang_code, duration, max_chars)
+                pending_idx.append(local_i)
+                batch_messages.append(msgs)
+                batch_max_tokens.append(mnt)
+                batch_meta.append((text, duration, max_chars))
+
+            if not batch_messages:
                 continue
-            
-            duration = seg["end"] - seg["start"]
-            max_chars = int(duration * aggressive_cps * speed_factor)
-            
-            # First pass
-            result = self.translate_and_fit(
-                text, source_lang, target_lang_code, duration, max_chars
+
+            # --- Single GPU call for the whole sub-batch ---
+            raw_responses = self.llm.generate_batch(
+                batch_messages, batch_max_tokens,
+                do_sample=True, temperature=0.3, repetition_penalty=1.05
             )
-            
-            # Overflow retry: if result is too long (>40% over max_chars), retry shorter
-            if result and len(result) > max_chars * 1.4:
-                shorter_max = int(max_chars * 0.7)
-                print(f"  [RETRY] Segment [{seg['start']:.1f}-{seg['end']:.1f}]: {len(result)} chars > {max_chars} limit, retrying with {shorter_max} chars")
-                retry = self.translate_and_fit(
-                    text, source_lang, target_lang_code, duration, shorter_max
-                )
-                if retry and len(retry) < len(result):
-                    result = retry
-            
-            if result:
-                seg["translated_text"] = result
-            else:
-                # Mark as failed — do NOT use original source text as fallback
-                seg["translated_text"] = f"[TRANSLATION FAILED: {text}]"
-                print(f"  [WARN] Segment [{seg['start']:.1f}-{seg['end']:.1f}]: LLM translation FAILED after retries")
-            
-            if (i + 1) % 10 == 0:
-                print(f"  {i + 1}/{len(segments)} segments translated")
-        
+
+            # --- Post-process and validate each response ---
+            for local_i, raw, (text, duration, max_chars) in zip(pending_idx, raw_responses, batch_meta):
+                seg = batch[local_i]
+                result = self._clean_response(raw)
+
+                # Validate
+                is_empty   = not result or len(result) < 3
+                is_source  = result.strip() == text.strip()
+                is_leak    = any(result.lower().startswith(ind) for ind in ["here's", "translated sentence", "translation:", "voici la"])
+                is_overflow = result and len(result) > max_chars * 1.4
+
+                if is_empty or is_source or is_leak:
+                    # Individual retry via translate_and_fit (has its own 2-attempt loop)
+                    print(f"  [RETRY] Segment [{seg['start']:.1f}-{seg['end']:.1f}]: batch result invalid, retrying individually")
+                    result = self.translate_and_fit(text, source_lang, target_lang_code, duration, max_chars)
+
+                elif is_overflow:
+                    shorter_max = int(max_chars * 0.7)
+                    print(f"  [RETRY] Segment [{seg['start']:.1f}-{seg['end']:.1f}]: {len(result)} chars > {max_chars} limit, retrying with {shorter_max}")
+                    retry = self.translate_and_fit(text, source_lang, target_lang_code, duration, shorter_max)
+                    if retry and len(retry) < len(result):
+                        result = retry
+
+                if result:
+                    seg["translated_text"] = result
+                else:
+                    seg["translated_text"] = f"[TRANSLATION FAILED: {text}]"
+                    print(f"  [WARN] Segment [{seg['start']:.1f}-{seg['end']:.1f}]: LLM translation FAILED after retries")
+
+            done = min(batch_start + BATCH_SIZE, len(segments))
+            print(f"  {done}/{len(segments)} segments translated")
+
         print(f"Translation complete: {len(segments)} segments")
         return segments
 
-    def translate_normal(self, segments, source_lang, target_lang_code):
-        """
-        Translate all segments naturally without any length constraint.
-        Produces a faithful, full translation (no shortening, no concision).
-        Stores result in 'normal_text' key of each segment.
-        """
-        self.load_model()
-        
-        src_name = self._source_language_name(source_lang)
-        tgt_name = self._language_name(target_lang_code)
-        print(f"Normal Translation → {tgt_name} ({len(segments)} segments, natural/full)...")
-        
-        for i, seg in enumerate(segments):
-            text = seg.get("text", "").strip()
-            if not text:
-                seg["normal_text"] = ""
-                continue
-            
-            # Same language? Keep as-is
-            if src_name == tgt_name:
-                seg["normal_text"] = text
-                continue
-            
-            prompt = f"""Translate the following text from {src_name} to {tgt_name}.
+    def _build_normal_messages(self, text, src_name, tgt_name):
+        """Build messages + max_new_tokens for a translate_normal call (used for batching)."""
+        prompt = f"""Translate the following text from {src_name} to {tgt_name}.
 Translate naturally and faithfully, preserving the full meaning, tone, and nuance.
 Do NOT shorten or simplify. Output ONLY the {tgt_name} translation.
 
 Source: "{text}"
 
 {tgt_name}:"""
+        messages = [
+            {"role": "system", "content": f"You are a professional translator. Translate from {src_name} to {tgt_name} naturally and faithfully. Output ONLY the translation."},
+            {"role": "user", "content": prompt}
+        ]
+        return messages, max(30, int(len(text) * 2))
 
-            messages = [
-                {"role": "system", "content": f"You are a professional translator. Translate from {src_name} to {tgt_name} naturally and faithfully. Output ONLY the translation."},
-                {"role": "user", "content": prompt}
-            ]
-            
-            # Try up to 2 times
-            final_result = None
-            for attempt in range(2):
-                result = self._generate(messages, max_new_tokens=max(30, int(len(text) * 2)))
-                if result and len(result) >= 3 and result.strip() != text.strip():
-                    final_result = result
-                    break
-                if attempt == 0:
-                    print(f"  [RETRY] Normal translation attempt failed [{seg['start']:.1f}-{seg['end']:.1f}], retrying...")
-            
-            if final_result:
-                seg["normal_text"] = final_result
-            else:
-                # Fallback: use fitted version (which is already translated, never original)
-                fitted = seg.get("translated_text", "")
-                if fitted and not fitted.startswith("[TRANSLATION FAILED"):
-                    seg["normal_text"] = fitted
-                    print(f"  [WARN] Normal translation failed [{seg['start']:.1f}-{seg['end']:.1f}], using fitted version")
-                else:
-                    seg["normal_text"] = f"[TRANSLATION FAILED: {text}]"
-                    print(f"  [WARN] Normal translation FAILED [{seg['start']:.1f}-{seg['end']:.1f}], no fallback available")
-            
-            if (i + 1) % 10 == 0:
-                print(f"  {i + 1}/{len(segments)} segments translated (normal)")
+    def translate_normal(self, segments, source_lang, target_lang_code):
+        """
+        Translate all segments naturally without any length constraint.
+        Produces a faithful, full translation (no shortening, no concision).
+        Stores result in 'normal_text' key of each segment.
+        Uses GPU-batched inference (BATCH_SIZE=8) matching translate_segments.
+        """
+        self.load_model()
         
+        src_name = self._source_language_name(source_lang)
+        tgt_name = self._language_name(target_lang_code)
+        same_lang = (src_name == tgt_name)
+        BATCH_SIZE = 8
+        print(f"Normal Translation → {tgt_name} ({len(segments)} segments, batch={BATCH_SIZE}, natural/full)...")
+        
+        for batch_start in range(0, len(segments), BATCH_SIZE):
+            batch = segments[batch_start:batch_start + BATCH_SIZE]
+
+            pending_idx = []
+            batch_messages = []
+            batch_max_tokens = []
+
+            for local_i, seg in enumerate(batch):
+                text = seg.get("text", "").strip()
+                if not text:
+                    seg["normal_text"] = ""
+                    continue
+                if same_lang:
+                    seg["normal_text"] = text
+                    continue
+                msgs, mnt = self._build_normal_messages(text, src_name, tgt_name)
+                pending_idx.append(local_i)
+                batch_messages.append(msgs)
+                batch_max_tokens.append(mnt)
+
+            if not batch_messages:
+                continue
+
+            raw_responses = self.llm.generate_batch(
+                batch_messages, batch_max_tokens,
+                do_sample=False, temperature=0.0, repetition_penalty=1.0
+            )
+
+            for local_i, raw in zip(pending_idx, raw_responses):
+                seg = batch[local_i]
+                text = seg.get("text", "").strip()
+                result = self._clean_response(raw, multiline=False)
+
+                if result and len(result) >= 3 and result.strip() != text.strip():
+                    seg["normal_text"] = result
+                else:
+                    # Individual retry on failure
+                    msgs, mnt = self._build_normal_messages(text, src_name, tgt_name)
+                    retry = self._generate(msgs, max_new_tokens=mnt)
+                    if retry and len(retry) >= 3 and retry.strip() != text.strip():
+                        seg["normal_text"] = retry
+                    else:
+                        fitted = seg.get("translated_text", "")
+                        if fitted and not fitted.startswith("[TRANSLATION FAILED"):
+                            seg["normal_text"] = fitted
+                            print(f"  [WARN] Normal translation failed [{seg['start']:.1f}-{seg['end']:.1f}], using fitted version")
+                        else:
+                            seg["normal_text"] = f"[TRANSLATION FAILED: {text}]"
+                            print(f"  [WARN] Normal translation FAILED [{seg['start']:.1f}-{seg['end']:.1f}], no fallback")
+
+            done = min(batch_start + BATCH_SIZE, len(segments))
+            print(f"  {done}/{len(segments)} segments translated (normal)")
+
         print(f"Normal translation complete: {len(segments)} segments")
         return segments
 

@@ -40,3 +40,10 @@ class LLMBackend(ABC):
     def generate(self, messages: list, max_new_tokens: int = 4096, multiline: bool = False) -> str:
         """Generate text from a list of conversational messages."""
         pass
+
+    def generate_batch(self, messages_list: list, max_new_tokens_list: list, **kwargs) -> list:
+        """Batched inference. Default: sequential fallback. Override for real batching."""
+        return [
+            self.generate(msgs, max_new_tokens=mnt, **kwargs)
+            for msgs, mnt in zip(messages_list, max_new_tokens_list)
+        ]

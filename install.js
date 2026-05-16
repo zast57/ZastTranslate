@@ -61,6 +61,8 @@ module.exports = {
                 message: "pip install flash-attn --no-build-isolation || echo FlashAttention not available - will use default attention"
             }
         },
+
+
         // 7. Verify full installation
         {
             method: "shell.run",
