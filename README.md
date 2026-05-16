@@ -107,6 +107,19 @@ Generate the dubbed video with synthesized speech.
 
 ![Dubbing tab](tuto4.jpg)
 
+### ⚙️ Config CPS — Voice Speed Calibration
+
+The **Config CPS** tab lets you tune the characters-per-second (CPS) speaking rate used to compute maximum Fitted text length per segment.
+
+| Column | Description |
+|---|---|
+| **Language** | Display name |
+| **ISO** | ISO 639-1 code |
+| **Default CPS** | Built-in calibrated value |
+| **Your CPS** | Your override — leave empty to use the default |
+
+Click **Save** to apply immediately (no restart required). Click **Reset to defaults** to clear all overrides.
+
 ### Step 5 — Bulk Mode
 
 Automate the translation and dubbing process for multiple languages down to a single click!

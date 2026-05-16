@@ -43,3 +43,41 @@ def get_fitted_cps(lang_code: str) -> float:
     if prefix in FITTED_CPS_BY_LANG:
         return FITTED_CPS_BY_LANG[prefix]
     return FITTED_CPS_BY_LANG["_default"]
+
+
+# ---------------------------------------------------------------------------
+# User overrides — persisted in user_cps_config.json (project root)
+# ---------------------------------------------------------------------------
+import json as _json
+import os as _os
+
+_USER_CPS_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "user_cps_config.json")
+
+
+def load_user_cps() -> dict:
+    """Load user CPS overrides. Returns {} if file absent or corrupt."""
+    try:
+        if _os.path.exists(_USER_CPS_PATH):
+            with open(_USER_CPS_PATH, "r", encoding="utf-8") as f:
+                return {k: float(v) for k, v in _json.load(f).items()}
+    except Exception:
+        pass
+    return {}
+
+
+def save_user_cps(overrides: dict) -> None:
+    """Persist user CPS overrides to JSON file."""
+    with open(_USER_CPS_PATH, "w", encoding="utf-8") as f:
+        _json.dump(overrides, f, indent=2, ensure_ascii=False)
+
+
+def get_effective_cps(lang_code: str, user_overrides: dict = None) -> float:
+    """Return CPS for lang_code: user override takes priority over the default table."""
+    lc = (lang_code or "").lower().replace("_", "-")
+    if user_overrides:
+        if lc in user_overrides:
+            return float(user_overrides[lc])
+        prefix = lc.split("-")[0]
+        if prefix in user_overrides:
+            return float(user_overrides[prefix])
+    return get_fitted_cps(lang_code)

@@ -27,7 +27,9 @@ from modules.video_assembler import VideoAssembler
 from modules.video_assembler import VideoAssembler
 from modules.srt_parser import SRTParser
 from modules.youtube_publisher import YouTubePublisher
-from fitted_cps_config import get_fitted_cps
+from fitted_cps_config import get_fitted_cps, get_effective_cps, load_user_cps, save_user_cps, FITTED_CPS_BY_LANG
+
+import pandas as pd
 
 # --- HELPERS ---
 
@@ -112,6 +114,26 @@ audio_mixer = AudioMixer()
 video_assembler = VideoAssembler()
 srt_parser = SRTParser()
 youtube_publisher = YouTubePublisher(BASE_DIR)
+
+# User CPS overrides (loaded once at startup, persisted to user_cps_config.json)
+_user_cps_overrides: dict = load_user_cps()
+
+
+def _build_cps_dataframe():
+    """Build the CPS config DataFrame shown in the Config tab."""
+    rows = []
+    for lang_name, nllb_code in sorted(LANGUAGES.items()):
+        iso = _get_iso_code(nllb_code).lower()
+        default_cps = FITTED_CPS_BY_LANG.get(iso, FITTED_CPS_BY_LANG["_default"])
+        override = _user_cps_overrides.get(iso, "")
+        rows.append({
+            "Language": lang_name,
+            "ISO": iso,
+            "Default CPS": default_cps,
+            "Your CPS": "" if override == "" else override,
+        })
+    return pd.DataFrame(rows)
+
 
 # --- UI FUNCTIONS ---
 
@@ -327,8 +349,8 @@ def step4_translate(target_lang, progress=gr.Progress()):
     source_lang = state.video_info.get('detected_language', 'en') if state.video_info else 'en'
     target_lang_code = LANGUAGES.get(target_lang, target_lang)
     lang_iso = _get_iso_code(target_lang_code).lower()
-    cps = get_fitted_cps(lang_iso)
-    print(f"[INFO] Using fitted_cps={cps} for target language '{lang_iso}'")
+    cps = get_effective_cps(lang_iso, _user_cps_overrides)
+    print(f"[INFO] Using fitted_cps={cps} for target language '{lang_iso}' (user override: {lang_iso in _user_cps_overrides})")
     speed_factor = tts_engine.capabilities.get("fitted_speed_factor", MAX_SPEED_FACTOR)
 
     if state.video_info:
@@ -395,7 +417,7 @@ def step4_translate(target_lang, progress=gr.Progress()):
         status_msg += f", {reformulated_count} adapted to fit timing"
     status_msg += "). Review below — ✅ fits, ⚠️ may overflow."
         
-    return status_msg, gr.Dataframe(value=data)
+    return status_msg, data
 
 def step5_save_translation(data):
     rows = _dataframe_to_rows(data)
@@ -615,8 +637,8 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         target_lang_code = LANGUAGES.get(target_lang, target_lang)
         iso = _get_iso_code(target_lang_code)
         lang_iso = iso.lower()
-        cps = get_fitted_cps(lang_iso)
-        print(f"[INFO] Using fitted_cps={cps} for target language '{lang_iso}'")
+        cps = get_effective_cps(lang_iso, _user_cps_overrides)
+        print(f"[INFO] Using fitted_cps={cps} for target language '{lang_iso}' (user override: {lang_iso in _user_cps_overrides})")
         speed_factor = tts_engine.capabilities.get("fitted_speed_factor", MAX_SPEED_FACTOR)
 
         if state.video_info:
@@ -992,8 +1014,8 @@ with gr.Blocks(title="ZastTranslate") as app:
         
         btn_bulk_run = gr.Button("Run Bulk Process", interactive=False, variant="primary")
         bulk_status_output = gr.Textbox(label="Status", interactive=False)
-        bulk_metadata_output = gr.Markdown(label="Translated Metadata")
         bulk_files_output = gr.File(label="Generated Files Output", file_count="multiple")
+        bulk_metadata_output = gr.Markdown(label="Translated Metadata", height=600)
         
         with gr.Row():
             btn_youtube_publish = gr.Button("🔴 Publish Metadata & Subtitles to YouTube", variant="primary", visible=False)
@@ -1049,7 +1071,9 @@ with gr.Blocks(title="ZastTranslate") as app:
                 "**Supported languages:** The dropdown dynamically updates based on the intersection of the selected **TTS Backend** and **LLM Backend**.\n"
                 "- **VoxCPM 2** supports 30 languages (Arabic, Burmese, Chinese, Danish, Dutch, English, Finnish, French, German, Greek, Hebrew, Hindi, Indonesian, Italian, Japanese, Khmer, Korean, Lao, Malay, Norwegian, Polish, Portuguese, Russian, Spanish, Swahili, Swedish, Tagalog, Thai, Turkish, Vietnamese).\n"
                 "- **Qwen2.5/3.5 LLM** support all languages. **EuroLLM** supports only European languages.\n\n"
-                "The available target languages are always the intersection of the TTS engine + LLM capabilities."
+                "The available target languages are always the intersection of the TTS engine + LLM capabilities.\n\n"
+                "**Fitted text length** is controlled by the CPS (chars/sec) calibration. "
+                "You can adjust per-language values in the **⚙️ Config CPS** tab."
             )
         
         with gr.Accordion("🎬 Tab 4 — Dubbing & Export", open=False):
@@ -1124,6 +1148,19 @@ with gr.Blocks(title="ZastTranslate") as app:
                 f"\n**Current system**: {GPU_NAME} ({GPU_VRAM}) — {'CUDA ✅' if DEVICE == 'cuda' else 'CPU mode ⚠️'}"
             )
         
+        with gr.Accordion("⚙️ Config CPS tab", open=False):
+            gr.Markdown(
+                "Customize the **characters-per-second (CPS)** speaking rate used to compute the maximum Fitted text length per segment.\n\n"
+                "| Column | Description |\n"
+                "|---|---|\n"
+                "| **Language** | Display name of the language |\n"
+                "| **ISO** | ISO 639-1 code used internally |\n"
+                "| **Default CPS** | Calibrated default from the built-in table |\n"
+                "| **Your CPS** | Your override — leave empty to use the default |\n\n"
+                "Click **Save** to apply changes immediately (no restart needed). "
+                "Click **Reset to defaults** to clear all overrides."
+            )
+
         with gr.Accordion("🔗 About / Links", open=False):
             gr.Markdown(
                 "**ZastTranslate** is made by Zast.\n\n"
@@ -1131,6 +1168,25 @@ with gr.Blocks(title="ZastTranslate") as app:
                 "- 🤓 [paradoxetemporel.fr](https://paradoxetemporel.fr) — Tech & Geek blog\n"
                 "- 🎬 [zast.fr](https://zast.fr) — YouTube channel"
             )
+
+    with gr.Tab("⚙️ Config CPS"):
+        gr.Markdown(
+            "### Voice Speed Calibration (Chars/sec) per Language\n\n"
+            "These values control the maximum text length in the **Fitted** column for each dubbing segment.\n"
+            "Fill in **Your CPS** only for the languages you want to customize — leave empty to use the default value.\n\n"
+            "> 💡 **Higher value** = longer Fitted text allowed (TTS speaks faster). "
+            "**Lower value** = shorter text (TTS speaks slower). Changes apply immediately after saving."
+        )
+        cps_table = gr.DataFrame(
+            value=_build_cps_dataframe(),
+            label="CPS table per language",
+            interactive=True,
+            wrap=True,
+        )
+        with gr.Row():
+            btn_save_cps = gr.Button("💾 Save", variant="primary", scale=1)
+            btn_reset_cps = gr.Button("↩️ Reset to defaults", variant="secondary", scale=1)
+        cps_status = gr.Markdown("")
 
     # EVENTS
     btn_check.click(step0_check_url, [url_input], [status_dl, yt_resolution, btn_dl])
@@ -1175,6 +1231,34 @@ with gr.Blocks(title="ZastTranslate") as app:
     )
     
     btn_youtube_publish.click(step6_publish_youtube, [], [bulk_publish_status])
+
+    # CPS Config tab handlers
+    def save_cps_table(df):
+        global _user_cps_overrides
+        overrides = {}
+        for _, row in df.iterrows():
+            iso = str(row["ISO"]).lower().strip()
+            val = row["Your CPS"]
+            if val is not None and str(val).strip() not in ("", "nan", "None"):
+                try:
+                    fval = float(val)
+                    if fval > 0:
+                        overrides[iso] = fval
+                except (ValueError, TypeError):
+                    pass
+        _user_cps_overrides = overrides
+        save_user_cps(overrides)
+        n = len(overrides)
+        return f"✅ Saved — {n} active override(s)."
+
+    def reset_cps_table():
+        global _user_cps_overrides
+        _user_cps_overrides = {}
+        save_user_cps({})
+        return _build_cps_dataframe(), "↩️ All values reset to defaults."
+
+    btn_save_cps.click(save_cps_table, [cps_table], [cps_status])
+    btn_reset_cps.click(reset_cps_table, [], [cps_table, cps_status])
 
     # Backend Change Logic
     def update_language_dropdowns():
