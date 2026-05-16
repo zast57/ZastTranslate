@@ -139,16 +139,16 @@ Automate the translation and dubbing process for multiple languages down to a si
 
 ![Bulk Mode Translated Output](bulk2.jpeg)
 
-### 🔴 Publish to YouTube (Bulk Mode only) — *OPTIONAL FEATURE*
+### 🔴 Publish to YouTube (Bulk Mode only) — *OPTIONAL FEATURE* ⚠️ EXPERIMENTAL (may crash)
 
-ZastTranslate can automatically upload your generated translations and subtitles directly to your YouTube channel! **This feature is 100% optional. If you do not configure it, the application will continue to generate your files locally without any issue.**
+ZastTranslate can automatically upload your generated translations and subtitles directly to your YouTube channel! **This feature is 100% optional and experimental — it may crash or behave unexpectedly. If you do not configure it, the application will continue to generate your files locally without any issue.**
 
-**La méthode "Développeur / Bring Your Own Key" (La meilleure pour cet outil) :**
-1. Tu vas sur la console Google Cloud.
-2. Tu actives l'API YouTube gratuitement.
-3. Tu télécharges un petit fichier `client_secret.json` que tu mets dans le dossier de ZastTranslate.
-4. L'application ouvre une page web te demandant : "ZastTranslate veut accéder à ta chaîne, acceptes-tu ?"
-5. Tu cliques sur Oui, et l'appli obtient un jeton d'accès sécurisé.
+**"Developer / Bring Your Own Key" method (recommended for this tool):**
+1. Go to the Google Cloud Console.
+2. Enable the YouTube Data API v3 for free.
+3. Download a `client_secret.json` file and place it in the ZastTranslate folder.
+4. The application will open a browser page asking: "ZastTranslate wants to access your channel, do you authorize?"
+5. Click Yes — the app will obtain a secure access token (one-time setup).
 
 **How to use it:**
 Once configured, whenever you import a video using a YouTube URL, the **Bulk Mode** tab will display a red "Publish Metadata & Subtitles to YouTube" button. 
@@ -234,8 +234,11 @@ These messages appear in the terminal but **do not affect functionality** and ca
 
 ## Credits
 
-- [WhisperX](https://github.com/m-bain/whisperX) — Speech recognition
-- [Qwen2.5-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct) — Translation & text fitting
+- [WhisperX](https://github.com/m-bain/whisperX) — Speech recognition & transcription
+- [Qwen2.5-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct) — LLM backend (text fitting & reformulation)
+- [Qwen3.5-9B](https://huggingface.co/Qwen/Qwen3.5-9B) — LLM backend (text fitting & reformulation)
+- [EuroLLM-9B-Instruct](https://huggingface.co/utter-project/EuroLLM-9B-Instruct) — LLM backend (European languages)
+- [VoxCPM 2](https://huggingface.co/openbmb/VoxCPM2) (openbmb/VoxCPM2) — TTS & voice cloning (30 languages)
 - [Demucs](https://github.com/facebookresearch/demucs) — Audio source separation
 - [Gradio](https://gradio.app/) — Web interface
 - [Pinokio](https://pinokio.computer/) — 1-click launcher
