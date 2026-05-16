@@ -1,6 +1,4 @@
 import os
-from .qwen3 import Qwen3Backend
-from .omnivoice import OmniVoiceBackend
 from .voxcpm2 import VoxCPM2Backend
 
 # Redirect HuggingFace cache to shared directory
@@ -11,8 +9,6 @@ os.environ["HF_HOME"] = HF_HOME
 class TTSFactory:
     def __init__(self):
         self._backends = {
-            "Qwen3-TTS": Qwen3Backend(),
-            "OmniVoice": OmniVoiceBackend(),
             "VoxCPM 2": VoxCPM2Backend(),
         }
         self._current_backend_name = None

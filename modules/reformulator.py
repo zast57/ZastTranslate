@@ -25,10 +25,25 @@ class Reformulator:
             "fra": "French", "eng": "English", "spa": "Spanish",
             "deu": "German", "ita": "Italian", "por": "Portuguese",
             "jpn": "Japanese", "kor": "Korean", "zho": "Chinese",
-            "rus": "Russian", "fr": "French", "en": "English",
-            "es": "Spanish", "de": "German", "it": "Italian",
-            "pt": "Portuguese", "ja": "Japanese", "ko": "Korean",
-            "zh": "Chinese", "ru": "Russian",
+            "rus": "Russian", "arb": "Arabic", "hin": "Hindi",
+            "nld": "Dutch", "pol": "Polish", "tur": "Turkish",
+            "swe": "Swedish", "ces": "Czech", "ron": "Romanian",
+            "hun": "Hungarian", "mya": "Burmese", "dan": "Danish",
+            "fin": "Finnish", "ell": "Greek", "heb": "Hebrew",
+            "ind": "Indonesian", "khm": "Khmer", "lao": "Lao",
+            "zsm": "Malay", "nob": "Norwegian", "swh": "Swahili",
+            "tgl": "Tagalog", "tha": "Thai", "vie": "Vietnamese",
+            "fr": "French", "en": "English", "es": "Spanish", 
+            "de": "German", "it": "Italian", "pt": "Portuguese", 
+            "ja": "Japanese", "ko": "Korean", "zh": "Chinese", 
+            "ru": "Russian", "ar": "Arabic", "hi": "Hindi", 
+            "nl": "Dutch", "pl": "Polish", "tr": "Turkish", 
+            "sv": "Swedish", "cs": "Czech", "ro": "Romanian", 
+            "hu": "Hungarian", "my": "Burmese", "da": "Danish",
+            "fi": "Finnish", "el": "Greek", "he": "Hebrew",
+            "id": "Indonesian", "km": "Khmer", "lo": "Lao",
+            "ms": "Malay", "no": "Norwegian", "sw": "Swahili",
+            "tl": "Tagalog", "th": "Thai", "vi": "Vietnamese"
         }
         for prefix, name in name_map.items():
             if lang_code.startswith(prefix):
@@ -41,7 +56,14 @@ class Reformulator:
             "fr": "French", "en": "English", "es": "Spanish",
             "de": "German", "it": "Italian", "pt": "Portuguese",
             "ja": "Japanese", "ko": "Korean", "zh": "Chinese",
-            "ru": "Russian",
+            "ru": "Russian", "ar": "Arabic", "hi": "Hindi",
+            "nl": "Dutch", "pl": "Polish", "tr": "Turkish",
+            "sv": "Swedish", "cs": "Czech", "ro": "Romanian",
+            "hu": "Hungarian", "my": "Burmese", "da": "Danish",
+            "fi": "Finnish", "el": "Greek", "he": "Hebrew",
+            "id": "Indonesian", "km": "Khmer", "lo": "Lao",
+            "ms": "Malay", "no": "Norwegian", "sw": "Swahili",
+            "tl": "Tagalog", "th": "Thai", "vi": "Vietnamese"
         }
         return short_map.get(lang_code, "Unknown")
 
@@ -58,9 +80,13 @@ class Reformulator:
         )
         
         # Strip <think> blocks (Qwen3 reasoning artifacts)
-        response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
-        response = re.sub(r'<think>.*', '', response, flags=re.DOTALL).strip()
+        response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL|re.IGNORECASE).strip()
+        response = re.sub(r'<think>.*', '', response, flags=re.DOTALL|re.IGNORECASE).strip()
         response = response.replace('<think>', '').replace('</think>', '').strip()
+        
+        # Strip DeepSeek/Qwen3 textual thinking blocks
+        response = re.sub(r'Thinking Process:.*?(?=\n\n|\Z)', '', response, flags=re.DOTALL|re.IGNORECASE).strip()
+        response = re.sub(r'Thinking Process:.*', '', response, flags=re.DOTALL|re.IGNORECASE).strip()
         
         # Strip LLM meta-comment lines ("Here's the translation:", "Translated:", etc.)
         _META_PATTERNS = [
@@ -189,10 +215,10 @@ ABSOLUTE RULES:
         self.load_model()
         
         tgt_name = self._language_name(target_lang_code)
-        print(f"LLM Translation → {tgt_name} ({len(segments)} segments, BRUTAL concision CPS=9)...")
+        print(f"LLM Translation → {tgt_name} ({len(segments)} segments, BRUTAL concision CPS={cps})...")
         
-        # Force CPS to 9 for aggressive brevity
-        aggressive_cps = 9
+        # Use the calibrated CPS (fitted to the actual TTS speaking rate)
+        aggressive_cps = cps
         
         for i, seg in enumerate(segments):
             text = seg.get("text", "").strip()
@@ -363,10 +389,10 @@ Shortened ({target_chars} chars max):"""
         target_lang = self._language_name(target_lang_code)
         source_lang = self._source_language_name(source_lang_code)
         
-        prompt = f"Translate the following text from {source_lang} to {target_lang}. Output ONLY the {target_lang} translation without any quotes or explanations.\n\n{text}"
+        prompt = f"Translate the following text from {source_lang} to {target_lang}.\nCRITICAL INSTRUCTION: Output ONLY the {target_lang} translation. DO NOT output your internal reasoning, DO NOT output 'Thinking Process:', and do not include any quotes or explanations.\n\nText to translate:\n{text}"
         
         messages = [
-            {"role": "system", "content": f"You are a professional translator. Translate from {source_lang} to {target_lang}. Output ONLY the translation."},
+            {"role": "system", "content": f"You are a professional translator. Translate from {source_lang} to {target_lang}. Output ONLY the raw translation. NEVER output a 'Thinking Process'."},
             {"role": "user", "content": prompt}
         ]
         

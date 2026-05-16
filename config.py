@@ -3,7 +3,7 @@ import torch
 
 # Nom du projet
 APP_NAME = "ZastTranslate"
-APP_VERSION = "0.99"
+APP_VERSION = "1.00"
 
 # Chemins
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -60,7 +60,8 @@ OUTPUT_BIT_DEPTH = 16
 MP3_BITRATE = "320k"
 
 # Supported languages (language codes)
-# Limited to languages supported by Qwen3-TTS for dubbing
+# Full list covering VoxCPM2 (30 langs) + Qwen3-TTS (10 langs)
+# The UI dynamically filters based on selected TTS + LLM backend capabilities
 LANGUAGES = {
     "Francais": "fra_Latn",
     "English": "eng_Latn",
@@ -81,4 +82,19 @@ LANGUAGES = {
     "Czech": "ces_Latn",
     "Romanian": "ron_Latn",
     "Hungarian": "hun_Latn",
+    # VoxCPM2 additional languages
+    "Burmese": "mya_Mymr",
+    "Danish": "dan_Latn",
+    "Finnish": "fin_Latn",
+    "Greek": "ell_Grek",
+    "Hebrew": "heb_Hebr",
+    "Indonesian": "ind_Latn",
+    "Khmer": "khm_Khmr",
+    "Lao": "lao_Laoo",
+    "Malay": "zsm_Latn",
+    "Norwegian": "nob_Latn",
+    "Swahili": "swh_Latn",
+    "Tagalog": "tgl_Latn",
+    "Thai": "tha_Thai",
+    "Vietnamese": "vie_Latn",
 }

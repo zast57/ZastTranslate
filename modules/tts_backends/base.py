@@ -53,3 +53,7 @@ class TTSBackend(ABC):
         Must return a dict {"duration": float, "path": str, "sample_rate": int}
         """
         pass
+
+    def cleanup(self):
+        """Alias for unload() — used by app.py to free VRAM."""
+        self.unload()

@@ -27,7 +27,7 @@ class OmniVoiceBackend(TTSBackend):
         }
 
     def is_available(self) -> bool:
-        return False  # Disabled until fully implemented in Pinokio
+        return True
 
     def load(self, ref_audio_path=None):
         if self.model is not None:

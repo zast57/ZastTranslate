@@ -1,3 +1,12 @@
+import warnings
+# Suppress noisy 3rd-party startup warnings
+warnings.filterwarnings("ignore", message="rope_config_validation", category=FutureWarning)
+warnings.filterwarnings("ignore", message="In 2.9, this function", category=UserWarning)
+warnings.filterwarnings("ignore", message="TensorFloat-32")
+warnings.filterwarnings("ignore", message="\ntorchcodec is not installed")  # pyannote wraps torchcodec RuntimeError
+warnings.filterwarnings("ignore", message="fast path is not available")
+warnings.filterwarnings("ignore", message="You are using a Python version", category=FutureWarning)  # google-api-core Python EOL warning
+
 import gradio as gr
 import os
 import shutil
@@ -29,7 +38,13 @@ _NLLB_TO_ISO = {
     "rus_Cyrl": "RU", "arb_Arab": "AR", "hin_Deva": "HI",
     "nld_Latn": "NL", "pol_Latn": "PL", "tur_Latn": "TR",
     "swe_Latn": "SV", "ces_Latn": "CS", "ron_Latn": "RO",
-    "hun_Latn": "HU"
+    "hun_Latn": "HU",
+    # VoxCPM2 additional languages
+    "mya_Mymr": "MY", "dan_Latn": "DA", "fin_Latn": "FI",
+    "ell_Grek": "EL", "heb_Hebr": "HE", "ind_Latn": "ID",
+    "khm_Khmr": "KM", "lao_Laoo": "LO", "zsm_Latn": "MS",
+    "nob_Latn": "NO", "swh_Latn": "SW", "tgl_Latn": "TL",
+    "tha_Thai": "TH", "vie_Latn": "VI",
 }
 
 def _get_iso_code(lang_code):
@@ -76,14 +91,14 @@ def save_config(config_data):
         json.dump(config_data, f)
 
 user_config = load_config()
-current_tts_backend = user_config.get("tts_backend", "Qwen3-TTS")
+current_tts_backend = user_config.get("tts_backend", "VoxCPM 2")
 current_llm_backend = user_config.get("llm_backend", "Qwen2.5-7B-Instruct")
 
 available_tts_backends = get_available_tts_backends()
 available_llm_backends = get_available_llm_backends()
 
 if current_tts_backend not in available_tts_backends:
-    current_tts_backend = "Qwen3-TTS"
+    current_tts_backend = "VoxCPM 2"
 if current_llm_backend not in available_llm_backends:
     current_llm_backend = "Qwen2.5-7B-Instruct"
 
@@ -201,7 +216,15 @@ def step2_transcribe(lang_source, model_size, progress=gr.Progress()):
     state.video_info['detected_language'] = res['language']
     if not state.keep_models:
         transcriber.cleanup()
-    
+
+    # Save source transcription for ICL voice cloning (much better quality than x-vector only)
+    ref_text_parts = [seg.get("text", "").strip() for seg in state.segments if seg.get("text", "").strip()]
+    ref_audio_text = " ".join(ref_text_parts)
+    ref_audio_text_path = os.path.join(TEMP_DIR, "ref_audio_text.txt")
+    with open(ref_audio_text_path, "w", encoding="utf-8") as _f:
+        _f.write(ref_audio_text)
+    print(f"Saved source transcription for voice cloning ({len(ref_audio_text)} chars)")
+
     # Prepare dataframe for editor
     data = []
     for seg in state.segments:
@@ -304,15 +327,18 @@ def step4_translate(target_lang, progress=gr.Progress()):
     target_lang_code = LANGUAGES.get(target_lang, target_lang)
     lang_family = time_sync.get_language_family(target_lang_code)
     cps = CHARS_PER_SECOND.get(lang_family, CHARS_PER_SECOND["default"])
+    # Use TTS backend's calibrated CPS if available (overrides language-family default)
+    cps = tts_engine.capabilities.get("fitted_cps", cps)
+    speed_factor = tts_engine.capabilities.get("fitted_speed_factor", MAX_SPEED_FACTOR)
 
     if state.video_info:
         state.video_info['target_language'] = target_lang_code
     
-    # PHASE 1: LLM fitted translation (Qwen3-8B) — aggressive concision for timing
+    # PHASE 1: LLM fitted translation — concision calibrated to TTS speaking rate
     progress(0.1, "Phase 1/3: Fitted translation (time-constrained)...")
     translated = reformulator.translate_segments(
         state.segments, source_lang, target_lang, target_lang_code,
-        cps=cps, speed_factor=MAX_SPEED_FACTOR
+        cps=cps, speed_factor=speed_factor
     )
     state.translated_segments = translated
     
@@ -322,7 +348,7 @@ def step4_translate(target_lang, progress=gr.Progress()):
     for seg in state.translated_segments:
         text = seg.get("translated_text", "")
         duration = seg["end"] - seg["start"]
-        max_chars = int(duration * cps * MAX_SPEED_FACTOR)
+        max_chars = int(duration * cps * speed_factor)
         
         if len(text) > max_chars * 1.1 and text.strip():
             try:
@@ -452,9 +478,7 @@ def step6_synthesize(voice_mode, voice_file, never_cut, progress=gr.Progress()):
     target_lang = state.video_info.get('target_language', 'fr') if state.video_info else 'fr'
     
     # Load models
-    tts_engine.load_model(voice_path=voice_path)
-    if voice_path:
-        tts_engine.set_reference_audio(voice_path)
+    tts_engine.load(ref_audio_path=voice_path)
     
     if never_cut:
         # ---- NEVER CUT VOCAL MODE ----
@@ -592,6 +616,9 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         iso = _get_iso_code(target_lang_code)
         lang_family = time_sync.get_language_family(target_lang_code)
         cps = CHARS_PER_SECOND.get(lang_family, CHARS_PER_SECOND["default"])
+        # Use TTS backend's calibrated CPS if available
+        cps = tts_engine.capabilities.get("fitted_cps", cps)
+        speed_factor = tts_engine.capabilities.get("fitted_speed_factor", MAX_SPEED_FACTOR)
 
         if state.video_info:
             state.video_info['target_language'] = target_lang_code
@@ -622,14 +649,14 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         progress(base_progress + prog_step * 0.2, f"[{target_lang}] Fitted translation...")
         translated = reformulator.translate_segments(
             state.segments, source_lang, target_lang, target_lang_code,
-            cps=cps, speed_factor=MAX_SPEED_FACTOR
+            cps=cps, speed_factor=speed_factor
         )
         
         progress(base_progress + prog_step * 0.5, f"[{target_lang}] Reformulating long segments...")
         for seg in translated:
             text = seg.get("translated_text", "")
             duration = seg["end"] - seg["start"]
-            max_chars = int(duration * cps * MAX_SPEED_FACTOR)
+            max_chars = int(duration * cps * speed_factor)
             
             if len(text) > max_chars * 1.1 and text.strip():
                 try:
@@ -671,7 +698,7 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
     elif voice_mode == "Clone from file" and voice_file:
         initial_voice_path = voice_file
 
-    tts_engine.load_model(voice_path=initial_voice_path) # Load once with correct model type
+    tts_engine.load(ref_audio_path=initial_voice_path) # Load once with correct model type
     
     for idx, target_lang in enumerate(target_langs):
         base_progress = 0.5 + (idx / total_langs) * 0.5
@@ -683,8 +710,7 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         yield f"[{idx+1}/{total_langs}] SYNTHESIS PHASE: {target_lang}...", output_files, metadata_display
         progress(base_progress + prog_step * 0.2, f"[{target_lang}] Initializing TTS...")
 
-        if initial_voice_path:
-            tts_engine.set_reference_audio(initial_voice_path)
+
 
         translated_for_lang = all_translated_segments[target_lang]
 
@@ -790,6 +816,31 @@ def step6_publish_youtube(progress=gr.Progress()):
 
 # --- GRADIO INTERFACE ---
 
+def get_valid_languages(tts_backend_name, llm_backend_name):
+    tts_engine_temp = get_tts_backend(tts_backend_name)
+    llm_engine_temp = get_llm_backend(llm_backend_name)
+    
+    tts_langs = tts_engine_temp.capabilities.get("languages", [])
+    llm_langs = llm_engine_temp.capabilities.get("languages", [])
+    
+    valid_lang_choices = []
+    for display_name, iso in LANGUAGES.items():
+        short_code = _get_iso_code(iso).lower()
+        
+        tts_ok = (tts_langs == "all") or (short_code in tts_langs)
+        llm_ok = (llm_langs == "all") or (short_code in llm_langs)
+        
+        if tts_ok and llm_ok:
+            valid_lang_choices.append(display_name)
+            
+    if not valid_lang_choices:
+        valid_lang_choices = list(LANGUAGES.keys())
+        
+    return valid_lang_choices
+
+INITIAL_VALID_LANGS = get_valid_languages(current_tts_backend, current_llm_backend)
+INITIAL_LANG_VALUE = INITIAL_VALID_LANGS[0] if INITIAL_VALID_LANGS else None
+
 with gr.Blocks(title="ZastTranslate") as app:
     # Embed logo as base64 to avoid Gradio version compatibility issues
     import base64 as _b64
@@ -861,7 +912,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         export_transcription_file = gr.File(label="Download SRT")
 
     with gr.Tab("3. Translation"):
-        lang_target = gr.Dropdown(list(LANGUAGES.keys()), label="Target Language", value="English")
+        lang_target = gr.Dropdown(INITIAL_VALID_LANGS, label="Target Language", value=INITIAL_LANG_VALUE)
         btn_translate = gr.Button("Run Translation", interactive=False, variant="primary")
         translation_status = gr.Textbox(label="Status", interactive=False)
         translation_df = gr.Dataframe(
@@ -905,7 +956,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         gr.Markdown("### Automate translation and dubbing for multiple languages at once")
         
         bulk_target_langs = gr.Dropdown(
-            list(LANGUAGES.keys()), 
+            INITIAL_VALID_LANGS, 
             label="Target Languages", 
             multiselect=True,
             info="Select all the languages you want to translate and dub."
@@ -996,14 +1047,11 @@ with gr.Blocks(title="ZastTranslate") as app:
                 "**Export options:**\n"
                 "- **Export Translation SRT** — Full natural translation as subtitles\n"
                 "- **Export Fitted SRT** — Concise dubbing-ready subtitles\n\n"
-                "**Supported languages** (limited to languages supported by Qwen3-TTS for dubbing):\n\n"
-                "| Language | Language |\n"
-                "|---|---|\n"
-                "| 🇫🇷 Français | 🇯🇵 Japanese |\n"
-                "| 🇬🇧 English | 🇰🇷 Korean |\n"
-                "| 🇪🇸 Español | 🇨🇳 Chinese (Simplified) |\n"
-                "| 🇩🇪 Deutsch | 🇷🇺 Russian |\n"
-                "| 🇮🇹 Italiano | 🇧🇷 Português |"
+                "**Supported languages:** The dropdown dynamically updates based on the intersection of the selected **TTS Backend** and **LLM Backend**.\n"
+                "- **VoxCPM 2** supports 30 languages (Arabic, Burmese, Chinese, Danish, Dutch, English, Finnish, French, German, Greek, Hebrew, Hindi, Indonesian, Italian, Japanese, Khmer, Korean, Lao, Malay, Norwegian, Polish, Portuguese, Russian, Spanish, Swahili, Swedish, Tagalog, Thai, Turkish, Vietnamese).\n"
+                "- **Qwen3-TTS** supports 10 languages (FR, EN, ES, DE, IT, PT, JA, KO, ZH, RU).\n"
+                "- **Qwen2.5/3.5 LLM** support all languages. **EuroLLM** supports only European languages.\n\n"
+                "The available target languages are always the intersection of the TTS engine + LLM capabilities."
             )
         
         with gr.Accordion("🎬 Tab 4 — Dubbing & Export", open=False):
@@ -1012,10 +1060,10 @@ with gr.Blocks(title="ZastTranslate") as app:
                 "**Voice Mode:**\n\n"
                 "| Mode | Description | When to use |\n"
                 "|---|---|---|\n"
-                "| **Default voice** | Qwen3-TTS preset voice | Quick dubbing, no reference needed |\n"
+                "| **Default voice** | TTS preset voice | Quick dubbing, no reference needed |\n"
                 "| **Clone from original** | Clones the speaker's voice from the extracted vocals | Best result — sounds like the original speaker |\n"
                 "| **Clone from file** | Uses an uploaded WAV/MP3 file as voice reference | When you want a specific voice |\n\n"
-                "💡 Voice cloning uses the Qwen3-TTS model, installed automatically during setup.\n\n"
+                "💡 Voice cloning uses the selected TTS model (Qwen3-TTS or VoxCPM 2).\n\n"
                 "**Options:**\n"
                 "- **Voice sample file** — Only needed for *Clone from file* mode. Use 10-30s of clear speech (WAV or MP3).\n"
                 "- **🔊 Never Cut Vocal** — Speaks all text in full without truncation. Produces more natural speech "
@@ -1031,6 +1079,21 @@ with gr.Blocks(title="ZastTranslate") as app:
         
 
         
+        with gr.Accordion("📚 Tab 5 — Bulk Mode", open=False):
+            gr.Markdown(
+                "Automate translation and dubbing for multiple languages simultaneously.\n\n"
+                "**How it works:**\n"
+                "1. Select all the target languages from the dropdown.\n"
+                "2. Optionally, provide the **Original Video Title** and **Description**, or click **⬇️ Import from URL** to fetch them automatically if you used a YouTube link.\n"
+                "3. Configure your **Voice Mode** and **Output Generation** preferences (Video+Audio or Audio Only).\n"
+                "4. Click **Run Bulk Process**. The system handles all translations first, then all audio synthesis, and packages everything in a ZIP file.\n\n"
+                "**YouTube Publishing (🔴 Publish Metadata & Subtitles to YouTube):**\n"
+                "- This button appears if you imported the video via a YouTube URL.\n"
+                "- It allows you to automatically upload the translated title, description, and subtitles (SRT) directly to your YouTube video.\n"
+                "- **Prerequisites**: You must have a Google Cloud API `client_secret.json` file (with YouTube Data API v3 enabled) placed in the application folder (`ZastTranslate/client_secret.json`). You must also own the YouTube channel.\n"
+                "- **Usage**: After the Bulk Process completes, click this button to upload the localized data to YouTube."
+            )
+
         with gr.Accordion("🔧 Troubleshooting", open=False):
             gr.Markdown(
                 "- **Models download on first run** — WhisperX, Qwen3-8B, Demucs, and TTS models are cached automatically (~8 GB total)\n"
@@ -1117,25 +1180,7 @@ with gr.Blocks(title="ZastTranslate") as app:
 
     # Backend Change Logic
     def update_language_dropdowns():
-        tts_engine_temp = get_tts_backend(current_tts_backend)
-        llm_engine_temp = get_llm_backend(current_llm_backend)
-        
-        tts_langs = tts_engine_temp.capabilities.get("languages", [])
-        llm_langs = llm_engine_temp.capabilities.get("languages", [])
-        
-        valid_lang_choices = []
-        for display_name, iso in LANGUAGES.items():
-            short_code = _get_iso_code(iso).lower()
-            
-            tts_ok = (tts_langs == "all") or (short_code in tts_langs)
-            llm_ok = (llm_langs == "all") or (short_code in llm_langs)
-            
-            if tts_ok and llm_ok:
-                valid_lang_choices.append(display_name)
-                
-        if not valid_lang_choices:
-            valid_lang_choices = list(LANGUAGES.keys())
-            
+        valid_lang_choices = get_valid_languages(current_tts_backend, current_llm_backend)
         new_lang_value = valid_lang_choices[0] if valid_lang_choices else None
         
         return (

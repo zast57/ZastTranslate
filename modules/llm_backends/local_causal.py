@@ -37,17 +37,22 @@ class LocalCausalLMBackend(LLMBackend):
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         
         if self.device == "cuda":
+            # 4-bit quantization: ~4.5GB GPU instead of ~18GB, keeps everything on GPU (faster than CPU offload)
             bnb_config = BitsAndBytesConfig(
                 load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_use_double_quant=True,
                 bnb_4bit_quant_type="nf4",
             )
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_id,
                 quantization_config=bnb_config,
-                device_map="auto",
+                device_map="cuda",
                 attn_implementation="sdpa",
             )
+            # Re-enable TF32 (pyannote disables it during transcription)
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
         else:
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_id,
@@ -73,7 +78,8 @@ class LocalCausalLMBackend(LLMBackend):
         text_input = self.tokenizer.apply_chat_template(
             messages,
             tokenize=False,
-            add_generation_prompt=True
+            add_generation_prompt=True,
+            enable_thinking=False  # CRITICAL: disable Qwen3/Reasoning models internal reasoning
         )
         model_inputs = self.tokenizer([text_input], return_tensors="pt").to(self.device)
 

@@ -118,7 +118,7 @@ class TimeSync:
                 warning_count += 1
         
         if warning_count > 0:
-            print(f"{warning_count} segments may still overflow (speed instruct + truncation will handle)")
+            print(f"{warning_count} segments may still overflow (LLM reformulation will handle during TTS)")
         
         return segments, 0
 
@@ -159,44 +159,57 @@ class TimeSync:
             current_duration = res["duration"]
             print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}]: Backend native duration control used ({current_duration:.2f}s)")
         else:
-            # PASS 1: Generate TTS at natural speed
+            # PASS 1: Generate TTS at natural speed (pass duration as hint for max_new_tokens capping)
             res = self.tts.generate(
-                text=text, language=language, output_path=temp_tts_path, 
-                ref_audio_path=voice_path
+                text=text, language=language, output_path=temp_tts_path,
+                ref_audio_path=voice_path, duration=effective_duration
             )
             current_duration = res["duration"]
             
             overflow = current_duration - effective_duration
-            
-            # PASS 2: If overflows, re-generate with speed instruction
-            if overflow > TOLERANCE_TOO_LONG and effective_duration > MIN_SEGMENT_DURATION:
-                speed_factor = min(current_duration / effective_duration, MAX_SPEED_FACTOR)
-                print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}]: {overflow:.2f}s over → re-generating at {speed_factor:.2f}x")
-                
-                temp_fast_path = os.path.join(TEMP_DIR, f"seg_{segment['start']:.2f}_fast.wav")
-                res_fast = self.tts.generate(
-                    text=text, language=language, output_path=temp_fast_path, 
-                    ref_audio_path=voice_path, speed=speed_factor
-                )
-                
-                # Use the faster version if it's shorter (instruct may not always work perfectly)
-                if res_fast["duration"] < current_duration:
-                    res = res_fast
-                    temp_tts_path = temp_fast_path
-                    current_duration = res["duration"]
-                    was_sped_up = True
-                    new_overflow = current_duration - effective_duration
-                    if new_overflow > TOLERANCE_TOO_LONG:
-                        print(f"  Still {new_overflow:.2f}s over after speedup — will truncate with fade-out")
-                    else:
-                        print(f"  Speed pass OK: {current_duration:.2f}s fits in {effective_duration:.2f}s slot")
-                else:
-                    print(f"  Speed instruct didn't help — keeping natural version")
+
+            # PASS 2+: LLM reformulation loop if audio is too long (SPEC §N.2 — max 3 attempts)
+            # Never use speed modification or truncation — only shorten text + re-generate TTS
+            if overflow > TOLERANCE_TOO_LONG and effective_duration > MIN_SEGMENT_DURATION and self.reformulator:
+                current_text = text
+                for attempt in range(3):
+                    # Scale target chars proportionally to the audio overflow ratio + 10% safety
+                    # This works for any TTS backend regardless of speaking rate
+                    scale = (effective_duration / current_duration) * 0.90
+                    target_chars = max(10, int(len(current_text) * scale))
+                    print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}]: {overflow:.2f}s over → LLM reformulation {attempt+1}/3 (≤{target_chars} chars)")
+                    try:
+                        shorter_text = self.reformulator.shorten(current_text, target_chars, language)
+                    except Exception as e:
+                        print(f"  Reformulation failed: {e}")
+                        break
+                    if not shorter_text or len(shorter_text) >= len(current_text):
+                        print(f"  Reformulation returned same/longer text, stopping")
+                        break
+                    temp_regen_path = os.path.join(TEMP_DIR, f"seg_{segment['start']:.2f}_regen{attempt}.wav")
+                    res_regen = self.tts.generate(
+                        text=shorter_text, language=language, output_path=temp_regen_path,
+                        ref_audio_path=voice_path, duration=effective_duration
+                    )
+                    regen_overflow = res_regen["duration"] - effective_duration
+                    print(f"  Regen: {res_regen['duration']:.2f}s (overflow: {regen_overflow:+.2f}s)")
+                    # Keep the best (shortest that fits or closest to fitting)
+                    if res_regen["duration"] < current_duration:
+                        res = res_regen
+                        temp_tts_path = temp_regen_path
+                        current_duration = res_regen["duration"]
+                        overflow = regen_overflow
+                    current_text = shorter_text
+                    if regen_overflow <= TOLERANCE_TOO_LONG:
+                        print(f"  Reformulation OK: {current_duration:.2f}s fits in {effective_duration:.2f}s slot")
+                        break
+                if overflow > TOLERANCE_TOO_LONG:
+                    print(f"  [{segment['start']:.1f}-{segment['end']:.1f}] Still {overflow:.2f}s over after reformulation — accepting (crossfade will handle)")
             elif current_duration > strict_duration + TOLERANCE_TOO_LONG:
                 gap_used = current_duration - strict_duration
                 print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}]: using {gap_used:.2f}s from gap")
 
-        # READ, RESAMPLE, SAVE
+        # READ, RESAMPLE, SAVE (no truncation — SPEC §N.2 forbids modifying audio)
         final_synced_path = os.path.join(TEMP_DIR, f"seg_{segment['start']:.2f}_synced.wav")
         
         audio, sr = sf.read(temp_tts_path)
@@ -206,16 +219,16 @@ class TimeSync:
         if audio.ndim > 1:
             audio = audio.mean(axis=1)
 
-        # PASS 3: Truncate with fade-out if STILL overflowing
-        # This prevents the next segment from overwriting the tail of this one
         final_overflow = len(audio) / sr - effective_duration
+
+        # PASS 3: Truncate with fade-out if still overflowing
+        # Prevents segments from overlapping each other in the assembled audio
         if final_overflow > TOLERANCE_TOO_LONG and effective_duration > MIN_SEGMENT_DURATION:
             max_samples = int(effective_duration * sr)
             if max_samples < len(audio):
                 FADE_OUT_MS = 80  # 80ms smooth fade-out
                 fade_samples = min(int(FADE_OUT_MS / 1000 * sr), max_samples // 2)
                 audio = audio[:max_samples]
-                # Apply fade-out at the end
                 fade = np.linspace(1.0, 0.0, fade_samples, dtype=np.float32)
                 audio[-fade_samples:] *= fade
                 was_truncated = True
@@ -231,7 +244,7 @@ class TimeSync:
             "start": segment["start"],
             "end": segment["end"],
             "final_text": text,
-            "sped_up": was_sped_up,
+            "sped_up": False,
             "truncated": was_truncated,
             "final_duration": round(actual_duration, 3),
             "slot_duration": round(effective_duration, 3),
@@ -250,18 +263,21 @@ class TimeSync:
         synced_segments = []
         sped_up_count = 0
         truncated_count = 0
-        overflow_count = 0  # Audio overflows slot (will lose tail in crossfade)
+        overflow_count = 0  # Audio overflows slot (crossfade handles)
         sped_up_list = []
         truncated_list = []
         overflow_list = []
         
-        for seg in segments:
+        total_segs = len(segments)
+        for i, seg in enumerate(segments):
             voice = None
             if voice_mapping:
                 spk = seg.get("speaker", "SPEAKER_00")
                 voice = voice_mapping.get(spk)
-                
+
+            print(f"[TTS] Segment {i+1}/{total_segs} [{seg['start']:.1f}s-{seg['end']:.1f}s] generating...", flush=True)
             res = self.sync_segment(seg, language, voice_path=voice)
+            print(f"[TTS] Segment {i+1}/{total_segs} done ({res.get('final_duration', res.get('duration', 0)):.2f}s)", flush=True)
             synced_segments.append(res)
             
             if res.get("sped_up"):
@@ -323,7 +339,8 @@ class TimeSync:
 
             tts_path = os.path.join(TEMP_DIR, f"nc_seg_{seg['start']:.2f}.wav")
             res = self.tts.generate(
-                text=text, language=language, output_path=tts_path, ref_audio_path=voice, speed=1.0
+                text=text, language=language, output_path=tts_path, ref_audio_path=voice, speed=1.0,
+                duration=strict_duration
             )
 
             results.append({

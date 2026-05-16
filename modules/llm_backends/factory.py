@@ -15,14 +15,15 @@ def get_available_backends() -> dict:
                 "vram_gb": 4.5
             }
         ),
-        "Qwen3.5-9B-Instruct": LocalCausalLMBackend(
-            name="Qwen3.5-9B-Instruct",
-            model_id="Qwen/Qwen3.5-9B-Instruct",
+        "Qwen3.5-9B": LocalCausalLMBackend(
+            name="Qwen3.5-9B",
+            model_id="Qwen/Qwen3.5-9B",
             capabilities={
                 "languages": "all",
                 "vram_gb": 6.0
             }
         ),
+
         "EuroLLM-9B-Instruct": LocalCausalLMBackend(
             name="EuroLLM-9B-Instruct",
             model_id="utter-project/EuroLLM-9B-Instruct",

@@ -2,13 +2,13 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 0.99
+# ZastTranslate — Release 1.00
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ⚠️ **Beta 0.99**: This software is under active development. Tested on **Windows only**. Some features may change.
+> ℹ️ **Release 1.00**: Major architectural update with multi-backend TTS & LLM support. Tested on **Windows only**. Some features may change.
 
-Translate any video into 10 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
+Translate any video into 33 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
 ## Features
 
@@ -83,7 +83,7 @@ Both columns are editable. The **Fitted** column is what will be spoken during d
 
 **Supported languages:** The dropdown automatically updates based on the **intersection** of the capabilities of the selected **TTS Backend** (Tab 1) and **LLM Backend** (Tab 2).
 For example:
-- **TTS:** Qwen3-TTS supports 10 languages. VoxCPM 2 supports additional languages like Polish and Dutch.
+- **TTS:** Qwen3-TTS supports 10 languages. VoxCPM 2 supports 30 languages (Arabic, Burmese, Chinese, Danish, Dutch, English, Finnish, French, German, Greek, Hebrew, Hindi, Indonesian, Italian, Japanese, Khmer, Korean, Lao, Malay, Norwegian, Polish, Portuguese, Russian, Spanish, Swahili, Swedish, Tagalog, Thai, Turkish, Vietnamese).
 - **LLM:** Qwen2.5/3.5 support all languages. EuroLLM supports only European languages.
 If you combine EuroLLM (European) with Qwen3-TTS (10 languages), only the European languages common to both will be available.
 
@@ -99,7 +99,7 @@ Generate the dubbed video with synthesized speech.
 | **Clone from original** | Clones the speaker's voice from the extracted vocals | Best result — sounds like the original speaker |
 | **Clone from file** | Uses an uploaded WAV/MP3 file as voice reference | When you want a specific voice (10-30s of clear speech) |
 
-> 💡 Voice cloning uses the Qwen3-TTS model, installed automatically during setup.
+> 💡 Voice cloning uses the selected TTS model (Qwen3-TTS or VoxCPM 2), installed automatically during setup.
 
 **🔊 Never Cut Vocal** mode speaks all text in full without truncation. Produces more natural speech but dubbing may drift out of sync with the video.
 
@@ -234,7 +234,9 @@ MIT
 
 ## History
 
-- **Version 0.99**
+- **Version 1.00**
+  - **Stability & Compatibility**: Fixed Qwen3-TTS loading issues on newest `transformers` versions (RoPE init patch).
+  - **Consistent Default Voice**: VoxCPM 2 now automatically uses the video's isolated vocals as its default reference instead of generating random voices.
   - **Multi-Backend TTS Architecture**: Decoupled `tts_engine.py` into a modular `tts_backends/` structure. Currently supports Qwen3-TTS and VoxCPM 2 natively, with an architecture ready to plug in future engines like OmniVoice once Windows support stabilizes.
   - **Multi-Backend LLM Architecture**: Added `llm_backends/` supporting Qwen2.5-7B, Qwen3.5-9B, and EuroLLM-9B.
   - **Dynamic Language Intersection**: UI dropdowns automatically filter target languages based on the intersection of the selected TTS and LLM backends' capabilities.

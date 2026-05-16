@@ -50,6 +50,14 @@ class Transcriber:
         # Cleanup alignment models
         cleanup_model(model_a)
         cleanup_model(model)
+        
+        # Re-enable TF32 — pyannote disables it for reproducibility,
+        # but we need it for fast LLM/TTS inference on Ampere+ GPUs
+        if self.device == "cuda":
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+            print("TF32 re-enabled after transcription")
+        
         return {
             "language": detected_lang,
             "segments": result["segments"]
