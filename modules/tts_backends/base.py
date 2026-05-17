@@ -47,7 +47,7 @@ class TTSBackend(ABC):
         pass
 
     @abstractmethod
-    def generate(self, text: str, language: str, output_path: str, ref_audio_path: str = None, speed: float = 1.0, duration: float = None) -> dict:
+    def generate(self, text: str, language: str, output_path: str, ref_audio_path: str = None, speed: float = 1.0, duration: float = None, gender: str = "Woman") -> dict:
         """
         Generate audio and save it to output_path.
         Must return a dict {"duration": float, "path": str, "sample_rate": int}

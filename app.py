@@ -240,13 +240,45 @@ def step2_transcribe(lang_source, model_size, progress=gr.Progress()):
     if not state.keep_models:
         transcriber.cleanup()
 
-    # Save source transcription for ICL voice cloning (much better quality than x-vector only)
+    # Save source transcription for ICL voice cloning
     ref_text_parts = [seg.get("text", "").strip() for seg in state.segments if seg.get("text", "").strip()]
     ref_audio_text = " ".join(ref_text_parts)
     ref_audio_text_path = os.path.join(TEMP_DIR, "ref_audio_text.txt")
     with open(ref_audio_text_path, "w", encoding="utf-8") as _f:
         _f.write(ref_audio_text)
     print(f"Saved source transcription for voice cloning ({len(ref_audio_text)} chars)")
+
+    # Extract a clean 5-15s segment for high-quality voice cloning
+    try:
+        import soundfile as sf
+        best_seg = None
+        max_duration = 0
+        # First pass: try to find a segment between 5 and 15 seconds
+        for seg in state.segments:
+            duration = seg['end'] - seg['start']
+            if 5 <= duration <= 15 and duration > max_duration:
+                max_duration = duration
+                best_seg = seg
+        # Fallback: take the longest segment available
+        if not best_seg and state.segments:
+            best_seg = max(state.segments, key=lambda s: s['end'] - s['start'])
+            
+        if best_seg and state.video_info and 'vocals' in state.video_info and os.path.exists(state.video_info['vocals']):
+            data, sr = sf.read(state.video_info['vocals'])
+            start_sample = int(best_seg['start'] * sr)
+            end_sample = int(best_seg['end'] * sr)
+            extracted = data[start_sample:end_sample]
+            out_path = os.path.join(TEMP_DIR, "ref_audio_extracted.wav")
+            sf.write(out_path, extracted, sr)
+            state.video_info['ref_audio_extracted'] = out_path
+            
+            out_text_path = os.path.join(TEMP_DIR, "ref_audio_extracted.txt")
+            with open(out_text_path, "w", encoding="utf-8") as f:
+                f.write(best_seg['text'].strip())
+            state.video_info['ref_audio_text'] = best_seg['text'].strip()
+            print(f"Extracted best reference audio: {best_seg['start']:.1f}s to {best_seg['end']:.1f}s")
+    except Exception as e:
+        print(f"Failed to extract clean reference audio: {e}")
 
     # Prepare dataframe for editor
     data = []
@@ -300,6 +332,36 @@ def step2b_import_srt(srt_file, lang_source):
         warning = ""
         if errors:
             warning = f" Warnings: {'; '.join(errors)}"
+            
+        # Extract a clean 5-15s segment for high-quality voice cloning
+        try:
+            import soundfile as sf
+            best_seg = None
+            max_duration = 0
+            for seg in state.segments:
+                duration = seg['end'] - seg['start']
+                if 5 <= duration <= 15 and duration > max_duration:
+                    max_duration = duration
+                    best_seg = seg
+            if not best_seg and state.segments:
+                best_seg = max(state.segments, key=lambda s: s['end'] - s['start'])
+                
+            if best_seg and state.video_info and 'vocals' in state.video_info and os.path.exists(state.video_info['vocals']):
+                data, sr = sf.read(state.video_info['vocals'])
+                start_sample = int(best_seg['start'] * sr)
+                end_sample = int(best_seg['end'] * sr)
+                extracted = data[start_sample:end_sample]
+                out_path = os.path.join(TEMP_DIR, "ref_audio_extracted.wav")
+                sf.write(out_path, extracted, sr)
+                state.video_info['ref_audio_extracted'] = out_path
+                
+                out_text_path = os.path.join(TEMP_DIR, "ref_audio_extracted.txt")
+                with open(out_text_path, "w", encoding="utf-8") as f:
+                    f.write(best_seg['text'].strip())
+                state.video_info['ref_audio_text'] = best_seg['text'].strip()
+                print(f"Extracted best reference audio: {best_seg['start']:.1f}s to {best_seg['end']:.1f}s")
+        except Exception as e:
+            print(f"Failed to extract clean reference audio: {e}")
         
         return f"SRT imported ({len(data)} segments).{warning} Review below, then click 'Validate Transcription'.", gr.Dataframe(value=data)
     except Exception as e:
@@ -470,7 +532,7 @@ def export_fitted_srt():
     srt_parser.segments_to_srt(state.translated_segments, srt_path, text_key="translated_text")
     return f"Exported {len(state.translated_segments)} segments (fitted for dubbing).", srt_path
 
-def step6_synthesize(voice_mode, voice_file, never_cut, progress=gr.Progress()):
+def step6_synthesize(voice_mode, voice_file, never_cut, default_voice_gender="Woman", progress=gr.Progress()):
     if not state.translated_segments:
         return "Error: No translation available.", None, None
     
@@ -484,12 +546,39 @@ def step6_synthesize(voice_mode, voice_file, never_cut, progress=gr.Progress()):
         state.video_info['background'] = stems['background']
         if not state.keep_models:
             separator.cleanup()
-    
+            
+        # Try to extract clean reference audio since we just got the vocals
+        try:
+            import soundfile as sf
+            best_seg = None
+            max_duration = 0
+            for seg in state.segments:
+                duration = seg['end'] - seg['start']
+                if 5 <= duration <= 15 and duration > max_duration:
+                    max_duration = duration
+                    best_seg = seg
+            if not best_seg and state.segments:
+                best_seg = max(state.segments, key=lambda s: s['end'] - s['start'])
+            if best_seg:
+                data, sr = sf.read(state.video_info['vocals'])
+                start_sample = int(best_seg['start'] * sr)
+                end_sample = int(best_seg['end'] * sr)
+                extracted = data[start_sample:end_sample]
+                out_path = os.path.join(TEMP_DIR, "ref_audio_extracted.wav")
+                sf.write(out_path, extracted, sr)
+                state.video_info['ref_audio_extracted'] = out_path
+        except Exception as e:
+            print(f"Failed to extract clean reference audio after delayed separation: {e}")
+
     # Determine voice path based on mode
     voice_path = None
     if voice_mode == "Clone from original" and state.video_info and 'vocals' in state.video_info:
-        voice_path = state.video_info['vocals']
-        print(f"Using original vocals for cloning: {voice_path}")
+        if 'ref_audio_extracted' in state.video_info and os.path.exists(state.video_info['ref_audio_extracted']):
+            voice_path = state.video_info['ref_audio_extracted']
+            print(f"Using cleanly extracted original vocals for cloning: {voice_path}")
+        else:
+            voice_path = state.video_info['vocals']
+            print(f"Using original vocals for cloning: {voice_path}")
     elif voice_mode == "Clone from file" and voice_file:
         voice_path = voice_file
         print(f"Using uploaded voice file for cloning: {voice_path}")
@@ -509,7 +598,7 @@ def step6_synthesize(voice_mode, voice_file, never_cut, progress=gr.Progress()):
         progress(0.2, "[Never Cut] Generating all audio at natural speed...")
         synced, drift_info = time_sync.sync_all_never_cut(
             state.translated_segments, target_lang,
-            state.video_info['duration'], voice_mapping=None
+            state.video_info['duration'], voice_mapping=None, gender=default_voice_gender
         )
         state.synced_segments = synced
         if not state.keep_models:
@@ -543,7 +632,7 @@ def step6_synthesize(voice_mode, voice_file, never_cut, progress=gr.Progress()):
         progress(0.3, f"Generating audio ({len(state.translated_segments)} segments)...")
         state.synced_segments, sync_stats = time_sync.sync_all(
             state.translated_segments, target_lang, voice_mapping=None,
-            total_duration=state.video_info.get('duration')
+            total_duration=state.video_info.get('duration'), gender=default_voice_gender
         )
         
         if not state.keep_models:
@@ -601,7 +690,7 @@ def export_audio():
     return "No audio available. Run Dubbing first.", None
 
 
-def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type, bulk_title, bulk_desc, progress=gr.Progress()):
+def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type, bulk_title, bulk_desc, default_voice_gender="Woman", progress=gr.Progress()):
     if not state.segments:
         yield "Error: No transcription available.", None
         return
@@ -626,6 +715,29 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         state.video_info['background'] = stems['background']
         if not state.keep_models:
             separator.cleanup()
+            
+        # Try to extract clean reference audio since we just got the vocals
+        try:
+            import soundfile as sf
+            best_seg = None
+            max_duration = 0
+            for seg in state.segments:
+                duration = seg['end'] - seg['start']
+                if 5 <= duration <= 15 and duration > max_duration:
+                    max_duration = duration
+                    best_seg = seg
+            if not best_seg and state.segments:
+                best_seg = max(state.segments, key=lambda s: s['end'] - s['start'])
+            if best_seg:
+                data, sr = sf.read(state.video_info['vocals'])
+                start_sample = int(best_seg['start'] * sr)
+                end_sample = int(best_seg['end'] * sr)
+                extracted = data[start_sample:end_sample]
+                out_path = os.path.join(TEMP_DIR, "ref_audio_extracted.wav")
+                sf.write(out_path, extracted, sr)
+                state.video_info['ref_audio_extracted'] = out_path
+        except Exception as e:
+            print(f"Failed to extract clean reference audio after delayed separation: {e}")
     
     # Phase 1: Translate ALL languages first to prevent VRAM fragmentation
     all_translated_segments = {}
@@ -715,7 +827,10 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
     # Determine voice path ONCE before loading model
     initial_voice_path = None
     if voice_mode == "Clone from original" and state.video_info and 'vocals' in state.video_info:
-        initial_voice_path = state.video_info['vocals']
+        if 'ref_audio_extracted' in state.video_info and os.path.exists(state.video_info['ref_audio_extracted']):
+            initial_voice_path = state.video_info['ref_audio_extracted']
+        else:
+            initial_voice_path = state.video_info['vocals']
     elif voice_mode == "Clone from file" and voice_file:
         initial_voice_path = voice_file
 
@@ -738,8 +853,7 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         if never_cut:
             progress(base_progress + prog_step * 0.4, f"[{target_lang}] Audio sync (Never Cut)...")
             synced, _ = time_sync.sync_all_never_cut(
-                translated_for_lang, target_lang_code,
-                state.video_info['duration'], voice_mapping=None
+                translated_for_lang, iso, state.video_info['duration'], voice_mapping=None, gender=default_voice_gender
             )
             
             progress(base_progress + prog_step * 0.7, f"[{target_lang}] Assembling audio...")
@@ -756,8 +870,8 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
             
             progress(base_progress + prog_step * 0.5, f"[{target_lang}] Generating audio...")
             synced, _ = time_sync.sync_all(
-                translated_for_lang, target_lang_code, voice_mapping=None,
-                total_duration=state.video_info.get('duration')
+                translated_for_lang, iso, voice_mapping=None,
+                total_duration=state.video_info.get('duration'), gender=default_voice_gender
             )
             
             progress(base_progress + prog_step * 0.7, f"[{target_lang}] Assembling audio...")
@@ -871,7 +985,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         with open(_logo_path, "rb") as _f:
             _logo_b64 = _b64.b64encode(_f.read()).decode()
         _logo_html = f"<center><img src='data:image/png;base64,{_logo_b64}' width='80' /></center>\n\n"
-    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.02\n**Offline video translation & dubbing (No Lip-Sync)**")
+    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.03\n**Offline video translation & dubbing (No Lip-Sync)**")
     
     with gr.Tab("1. Import"):
         url_input = gr.Textbox(label="YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
@@ -956,7 +1070,13 @@ with gr.Blocks(title="ZastTranslate") as app:
             value="Default voice",
             info="'Clone from original' uses the separated vocals from step 2. 'Clone from file' requires uploading a voice sample."
         )
-        voice_file = gr.File(label="Voice sample file (WAV/MP3, 10-30s of clear speech)", visible=True)
+        default_voice_gender = gr.Radio(
+            ["Man", "Woman"],
+            label="Default Voice Gender",
+            value="Woman",
+            visible=True
+        )
+        voice_file = gr.File(label="Voice sample file (WAV/MP3, 10-30s of clear speech)", visible=False)
         
         never_cut_mode = gr.Checkbox(
             label="🔊 Never Cut Vocal",
@@ -996,6 +1116,12 @@ with gr.Blocks(title="ZastTranslate") as app:
                 label="Voice Mode", 
                 value="Default voice"
             )
+            bulk_default_voice_gender = gr.Radio(
+                ["Man", "Woman"],
+                label="Default Voice Gender",
+                value="Woman",
+                visible=True
+            )
             bulk_output_type = gr.Radio(
                 ["Video + Audio", "Audio Only"],
                 label="Output Generation",
@@ -1003,7 +1129,7 @@ with gr.Blocks(title="ZastTranslate") as app:
                 info="'Video + Audio' will render the final MP4. 'Audio Only' will just output the WAV track."
             )
             
-        bulk_voice_file = gr.File(label="Voice sample file (WAV/MP3, 10-30s of clear speech)", visible=True)
+        bulk_voice_file = gr.File(label="Voice sample file (WAV/MP3, 10-30s of clear speech)", visible=False)
         
         bulk_never_cut_mode = gr.Checkbox(
             label="🔊 Never Cut Vocal",
@@ -1213,6 +1339,12 @@ with gr.Blocks(title="ZastTranslate") as app:
     never_cut_mode.change(toggle_never_cut_warning, [never_cut_mode], [never_cut_warning])
     bulk_never_cut_mode.change(toggle_never_cut_warning, [bulk_never_cut_mode], [bulk_never_cut_warning])
     
+    def toggle_voice_inputs(mode):
+        return gr.update(visible=(mode == "Clone from file")), gr.update(visible=(mode == "Default voice"))
+        
+    voice_mode.change(toggle_voice_inputs, inputs=[voice_mode], outputs=[voice_file, default_voice_gender])
+    bulk_voice_mode.change(toggle_voice_inputs, inputs=[bulk_voice_mode], outputs=[bulk_voice_file, bulk_default_voice_gender])
+    
     keep_models_ui.change(lambda x: setattr(state, 'keep_models', x), inputs=[keep_models_ui], outputs=[])
     
     def import_metadata_from_state():
@@ -1221,12 +1353,12 @@ with gr.Blocks(title="ZastTranslate") as app:
         return "", ""
     btn_import_metadata.click(import_metadata_from_state, [], [bulk_title_input, bulk_desc_input])
     
-    btn_synth.click(step6_synthesize, [voice_mode, voice_file, never_cut_mode], [synth_status, final_video_out, final_audio_out])
+    btn_synth.click(step6_synthesize, [voice_mode, voice_file, never_cut_mode, default_voice_gender], [synth_status, final_video_out, final_audio_out])
     btn_export_audio.click(export_audio, [], [synth_status, export_audio_file])
     
     btn_bulk_run.click(
         step5_bulk_run, 
-        [bulk_target_langs, bulk_voice_mode, bulk_voice_file, bulk_never_cut_mode, bulk_output_type, bulk_title_input, bulk_desc_input], 
+        [bulk_target_langs, bulk_voice_mode, bulk_voice_file, bulk_never_cut_mode, bulk_output_type, bulk_title_input, bulk_desc_input, bulk_default_voice_gender], 
         [bulk_status_output, bulk_files_output, bulk_metadata_output]
     )
     

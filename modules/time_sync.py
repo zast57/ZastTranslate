@@ -122,7 +122,7 @@ class TimeSync:
         
         return segments, 0
 
-    def sync_segment(self, segment, language, voice_path=None):
+    def sync_segment(self, segment, language, voice_path=None, gender="Woman"):
         """
         Synchronize a segment with two-pass speed control:
         1. Generate TTS at natural speed
@@ -154,7 +154,7 @@ class TimeSync:
             # PASS 1: Generate EXACTLY at the target duration
             res = self.tts.generate(
                 text=text, language=language, output_path=temp_tts_path, 
-                ref_audio_path=voice_path, duration=effective_duration
+                ref_audio_path=voice_path, duration=effective_duration, gender=gender
             )
             current_duration = res["duration"]
             print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}]: Backend native duration control used ({current_duration:.2f}s)")
@@ -162,7 +162,7 @@ class TimeSync:
             # PASS 1: Generate TTS at natural speed (pass duration as hint for max_new_tokens capping)
             res = self.tts.generate(
                 text=text, language=language, output_path=temp_tts_path,
-                ref_audio_path=voice_path, duration=effective_duration
+                ref_audio_path=voice_path, duration=effective_duration, gender=gender
             )
             current_duration = res["duration"]
             
@@ -189,7 +189,7 @@ class TimeSync:
                     temp_regen_path = os.path.join(TEMP_DIR, f"seg_{segment['start']:.2f}_regen{attempt}.wav")
                     res_regen = self.tts.generate(
                         text=shorter_text, language=language, output_path=temp_regen_path,
-                        ref_audio_path=voice_path, duration=effective_duration
+                        ref_audio_path=voice_path, duration=effective_duration, gender=gender
                     )
                     regen_overflow = res_regen["duration"] - effective_duration
                     print(f"  Regen: {res_regen['duration']:.2f}s (overflow: {regen_overflow:+.2f}s)")
@@ -251,7 +251,7 @@ class TimeSync:
             "overflow": round(overflow_secs, 3),
         }
 
-    def sync_all(self, segments, language, voice_mapping=None, total_duration=None):
+    def sync_all(self, segments, language, voice_mapping=None, total_duration=None, gender="Woman"):
         """Sync all segments with global gap awareness.
         
         Returns:
@@ -276,7 +276,7 @@ class TimeSync:
                 voice = voice_mapping.get(spk)
 
             print(f"[TTS] Segment {i+1}/{total_segs} [{seg['start']:.1f}s-{seg['end']:.1f}s] generating...", flush=True)
-            res = self.sync_segment(seg, language, voice_path=voice)
+            res = self.sync_segment(seg, language, voice_path=voice, gender=gender)
             print(f"[TTS] Segment {i+1}/{total_segs} done ({res.get('final_duration', res.get('duration', 0)):.2f}s)", flush=True)
             synced_segments.append(res)
             
@@ -314,7 +314,7 @@ class TimeSync:
 
     # ---- NEVER CUT VOCAL MODE ----
 
-    def _generate_all_natural(self, segments, language, voice_mapping=None):
+    def _generate_all_natural(self, segments, language, voice_mapping=None, gender="Woman"):
         """
         Phase 1: Generate ALL TTS at natural speed (no speedup, no truncation).
         Returns segments enriched with tts_path and tts_duration (real measured).
@@ -340,7 +340,7 @@ class TimeSync:
             tts_path = os.path.join(TEMP_DIR, f"nc_seg_{seg['start']:.2f}.wav")
             res = self.tts.generate(
                 text=text, language=language, output_path=tts_path, ref_audio_path=voice, speed=1.0,
-                duration=strict_duration
+                duration=strict_duration, gender=gender
             )
 
             results.append({
@@ -467,7 +467,7 @@ class TimeSync:
 
         return segments, drift_info
 
-    def sync_all_never_cut(self, segments, language, total_duration, voice_mapping=None):
+    def sync_all_never_cut(self, segments, language, total_duration, voice_mapping=None, gender="Woman"):
         """
         Never Cut Vocal mode: generate all TTS at natural speed, then
         plan cascade placement using global gap analysis.
@@ -481,7 +481,7 @@ class TimeSync:
         print(f"{'='*60}")
 
         # Phase 1: Generate all TTS at natural speed
-        enriched = self._generate_all_natural(segments, language, voice_mapping)
+        enriched = self._generate_all_natural(segments, language, voice_mapping, gender=gender)
 
         # Phase 2: Plan cascade placement
         placed, drift_info = self._plan_cascade_placement(enriched, total_duration)

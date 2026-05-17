@@ -103,23 +103,13 @@ class VoxCPM2Backend(TTSBackend):
         self._trimmed_ref_cache[cache_key] = trim_path
         return trim_path
 
-    def generate(self, text: str, language: str, output_path: str, ref_audio_path: str = None, speed: float = 1.0, duration: float = None) -> dict:
+    def generate(self, text: str, language: str, output_path: str, ref_audio_path: str = None, speed: float = 1.0, duration: float = None, gender: str = "Woman") -> dict:
         if self.model is None:
             self.load()
             
         final_ref = ref_audio_path if ref_audio_path and os.path.exists(ref_audio_path) else getattr(self, 'default_ref_audio', None)
-        
-        # If no reference is provided, fallback to the video's own vocals.
-        # Cache the glob result so we don't scan the filesystem on every segment.
-        if not final_ref or not os.path.exists(final_ref):
-            cached = getattr(self, '_cached_ref_path', None)
-            if cached and os.path.exists(cached):
-                final_ref = cached
-            else:
-                import glob
-                vocals_files = glob.glob(os.path.join(TEMP_DIR, "htdemucs", "*", "vocals.wav"))
-                final_ref = vocals_files[0] if vocals_files else None
-                self._cached_ref_path = final_ref
+        if final_ref and not os.path.exists(final_ref):
+            final_ref = None
 
         # CRITICAL: trim reference audio to 30s max.
         # Full-length vocals.wav (10+ min) fills the LM KV-cache with thousands of tokens → 23+ GB VRAM.
@@ -128,6 +118,31 @@ class VoxCPM2Backend(TTSBackend):
             final_ref = self._get_trimmed_ref(final_ref, max_seconds=30.0)
 
         modified_text = self._inject_speed_prompt(text, speed)
+        # If no reference is provided (no cloning mode), we MUST use a cached default wav.
+        # Otherwise, Voice Design will generate a slightly different voice for every sentence!
+        if not final_ref:
+            voices_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "voices")
+            os.makedirs(voices_dir, exist_ok=True)
+            
+            # Use gender-specific default voice
+            gender_str = str(gender).lower()
+            default_wav = os.path.join(voices_dir, f"default_{gender_str}.wav")
+            
+            if not os.path.exists(default_wav):
+                print(f"VoxCPM 2: Generating a persistent default voice (default_{gender_str}.wav) to ensure consistency...")
+                prompt = f"(A clear, professional and expressive {gender_str} voice) Hello, this is the default voice for your translations."
+                wav = self.model.generate(
+                    text=prompt,
+                    normalize=False,
+                    inference_timesteps=10,
+                    denoise=True
+                )
+                sr = getattr(self.model.tts_model, 'sample_rate', 24000)
+                sf.write(default_wav, wav, sr)
+                print(f"VoxCPM 2: Saved default voice to {default_wav}")
+            
+            final_ref = default_wav
+            
         print(f"VoxCPM 2 generate: modified_text='{modified_text}', lang={language}, ref={final_ref}")
         
         # Generate speech — normalize=False to avoid Chinese text normalizer mangling English

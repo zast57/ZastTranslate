@@ -44,7 +44,7 @@ class OmniVoiceBackend(TTSBackend):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-    def generate(self, text: str, language: str, output_path: str, ref_audio_path: str = None, speed: float = 1.0, duration: float = None) -> dict:
+    def generate(self, text: str, language: str, output_path: str, ref_audio_path: str = None, speed: float = 1.0, duration: float = None, gender: str = "Woman", **kwargs) -> dict:
         if self.model is None:
             self.load(ref_audio_path)
             
