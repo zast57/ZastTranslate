@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 1.05
+# ZastTranslate — Beta 1.06
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ℹ️ **Beta 1.05**: Added support for local audio file import (MP3, WAV, etc.), auto-adapting layouts and outputs to audio-only mode, and skipping video assembly for pure audio projects. Tested on **Windows only**. Some features may change.
+> ℹ️ **Beta 1.06**: Added an interactive timeline segment editor, seek-on-click row navigation, real-time client-side subtitle preview overlays, and single-line audio regeneration with cached timing controls. Tested on **Windows only**.
 
 Translate any video into 33 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -37,6 +37,23 @@ Translate any video into 33 languages with natural-sounding dubbed audio. Option
 4. Click **Start** — launches the Gradio web interface
 
 ## Usage
+
+### 📺 Preview & Subtitles Panel (Left Column)
+
+ZastTranslate's user interface is split into two columns: the **Persistent Preview Panel** on the left, and the **Action Tabs** on the right. 
+
+The Left Column provides interactive controls that sync with your workflow tabs:
+- **Video & Audio Player Preview** — Displays the uploaded or downloaded video/audio file.
+- **Preview Subtitles** — Toggle subtitle overlays directly on top of the player in real-time. Choose between:
+  - `None` — No subtitles.
+  - `Original` — Transcribed text from Step 2.
+  - `Translation (Fitted)` — Concise translation text for dubbing from Step 3.
+  - `Translation (Normal)` — Full translation text from Step 3.
+- **Dynamic Subtitle Overlay Box** — Renders subtitles in real-time, synchronized with the video player's playhead position.
+- **Seek-on-Click Row Navigation** — Click on any dialogue row in the Transcription, Translation, or Dialogue lists to instantly jump the video/audio player playhead to the start time of that segment.
+- **JS Debug Log** — Displays Svelte/Gradio communication logs for monitoring media player playback states.
+
+---
 
 ### Step 1 — Import
 
@@ -74,6 +91,7 @@ Select the target language and click **Run Translation**. The app generates two 
 - **Fitted** — Concise version shortened to fit segment duration for dubbing (✅ = fits, ⚠️ = may overflow)
 
 ![Translation tab](tuto3.jpg)
+![Translation tab](tuto3b.jpg)
 
 Both columns are editable. The **Fitted** column is what will be spoken during dubbing.
 
@@ -91,6 +109,18 @@ If you combine EuroLLM (European) with VoxCPM 2, only the European languages sup
 
 Generate the dubbed video with synthesized speech.
 
+![Dubbing tab](tuto4c.jpg)
+
+#### 📝 Interactive Segment Editor & Timeline Adjustments
+
+Under the main dialogue segments table, a specialized **Segment Editor Card** opens when you select a segment row:
+- **Seek-on-Click**: Clicking on any dialogue segment row instantly jumps the video/audio player playhead to the segment's starting time.
+- **Timing Calibration**: You can adjust the **Start time** and **End time** (in minutes and seconds) of the selected segment to fine-tune the synchronization.
+- **Text Editing**: Edit the dialogue text of the segment directly. If using *Fitted Translation*, editing the text will immediately update the dubbing TTS script.
+- **🔄 Regenerate Segment Audio**: Re-synthesize the voice for the selected segment only and update the local cache immediately on disk. This allows you to iteratively test and tune specific lines without reprocessing the whole video.
+- **⚠️ Reformulation Warning**: If a segment is shortened or reformulated by the translation LLM to fit timing constraints during synthesis, the editor card displays a warning icon ⚠️ and the exact shortened text so you can review it.
+![Dubbing tab](tuto4.jpg)
+![Dubbing tab](tuto4b.jpg)
 ### Voice modes
 
 | Mode | Description | When to use |
@@ -105,10 +135,10 @@ Generate the dubbed video with synthesized speech.
 
 **Output:** Final dubbed MP4 video + mixed audio (downloadable as WAV).
 
-![Dubbing tab](tuto4.jpg)
+
 
 ### ⚙️ Config CPS — Voice Speed Calibration
-
+![config tab](tutocps.jpeg)
 The **Config CPS** tab lets you tune the characters-per-second (CPS) speaking rate used to compute maximum Fitted text length per segment.
 
 | Column | Description |
@@ -135,9 +165,9 @@ Automate the translation and dubbing process for multiple languages down to a si
 
 > ⚡ **Memory Optimized**: In Bulk Mode, the pipeline translates ALL languages first, completely unloads the LLM, and then loads the Voice Synthesis AI. This prevents VRAM fragmentation and allows you to run massive multi-language batches efficiently even on an RTX 4090.
 
-![Bulk Mode Original Title & Description](bulk1.jpeg)
+![Bulk Mode Original Title & Description](bulk.jpg)
 
-![Bulk Mode Translated Output](bulk2.jpeg)
+![Bulk Mode Translated Output](bulk1.jpeg)
 
 ### 🔴 Publish to YouTube (Bulk Mode only) — *OPTIONAL FEATURE* ⚠️ EXPERIMENTAL (may crash)
 
@@ -249,6 +279,12 @@ MIT
 
 ## History
 
+- **Beta 1.06**
+  - **Interactive Timeline Segment Editor**: Restructured main app layout into a two-column interface with a persistent preview column (video/audio players, interactive subtitle preview selectors, dynamic subtitle overlay) on the left, and action tabs on the right.
+  - **Click-to-Seek row navigation**: Clicking on any dialogue segment row in the Transcription, Translation, or Dubbing lists instantly jumps the video player playhead to the segment's starting time.
+  - **Single-Segment Synthesis & Timing Calibration**: Select a line in the dialogue lists to open the segment editor card, adjust text and start/end times in minutes and seconds, and re-synthesize that segment only (updating its cache on disk) without reprocessing the whole video.
+  - **Reformulation Warnings & Count Tracking**: Added warnings showing if a segment was shortened/reformulated to fit time constraints, displaying a warn icon ⚠️ and the exact shortened text in the segment editor, plus total counts in the main synthesis status.
+  - **Metadata Copy Buttons**: Integrated copy-to-clipboard icons directly inside the Translated Video Title and Description text fields.
 - **Beta 1.05**
   - **Local Audio Support**: Added the ability to upload local audio files (MP3, WAV, M4A, etc.) in the Import tab.
   - **Adaptive Output & Layouts**: Toggles between video and audio player previews dynamically. If an audio file is imported, Dubbing and Export skips video packaging, and Bulk Mode automatically locks the output generation choice to "Audio Only".

@@ -1,7 +1,7 @@
 module.exports = {
   version: "5.0",
-  title: "ZastTranslate — Beta 1.00",
-  description: "Video translation & dubbing with voice cloning — 100% local, zero API. 10 languages, AI dubbing.",
+  title: "ZastTranslate — Beta 1.06",
+  description: "Video translation & dubbing with voice cloning — 100% local, zero API. Supports 30 languages (VoxCPM 2) with per-language CPS calibration, automatic transcription, translation, and AI dubbing.",
   icon: "zastttranslate.png",
   menu: async (kernel, info) => {
     let installed = info.exists("env")

@@ -143,6 +143,28 @@ class TimeSync:
 
         text = segment.get("translated_text", segment.get("text", ""))
         effective_duration = segment.get("effective_duration", strict_duration)
+        
+        # Cache reuse check
+        final_synced_path = os.path.join(TEMP_DIR, f"seg_{segment['start']:.2f}_synced.wav")
+        if os.path.exists(final_synced_path):
+            print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}]: Reusing cached audio {final_synced_path}")
+            try:
+                info = sf.info(final_synced_path)
+                actual_duration = info.duration
+                return {
+                    "synced_path": final_synced_path,
+                    "start": segment["start"],
+                    "end": segment["end"],
+                    "final_text": text,
+                    "sped_up": False,
+                    "truncated": False,
+                    "final_duration": round(actual_duration, 3),
+                    "slot_duration": round(effective_duration, 3),
+                    "overflow": 0.0,
+                }
+            except Exception as e:
+                print(f"Failed to read cached segment audio info: {e}. Re-generating...")
+
         was_sped_up = False
         was_truncated = False
         
@@ -167,6 +189,7 @@ class TimeSync:
             current_duration = res["duration"]
             
             overflow = current_duration - effective_duration
+            final_text = text
 
             # PASS 2+: LLM reformulation loop if audio is too long (SPEC §N.2 — max 3 attempts)
             # Never use speed modification or truncation — only shorten text + re-generate TTS
@@ -199,6 +222,7 @@ class TimeSync:
                         temp_tts_path = temp_regen_path
                         current_duration = res_regen["duration"]
                         overflow = regen_overflow
+                        final_text = shorter_text
                     current_text = shorter_text
                     if regen_overflow <= TOLERANCE_TOO_LONG:
                         print(f"  Reformulation OK: {current_duration:.2f}s fits in {effective_duration:.2f}s slot")
@@ -208,6 +232,14 @@ class TimeSync:
             elif current_duration > strict_duration + TOLERANCE_TOO_LONG:
                 gap_used = current_duration - strict_duration
                 print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}]: using {gap_used:.2f}s from gap")
+
+        # Update segment text directly if it was reformulated
+        if final_text != text:
+            segment["translated_text"] = final_text
+            if "fitted_text" in segment:
+                segment["fitted_text"] = final_text
+            if "normal_text" in segment:
+                segment["normal_text"] = final_text
 
         # READ, RESAMPLE, SAVE (no truncation — SPEC §N.2 forbids modifying audio)
         final_synced_path = os.path.join(TEMP_DIR, f"seg_{segment['start']:.2f}_synced.wav")
@@ -243,9 +275,10 @@ class TimeSync:
             "synced_path": final_synced_path,
             "start": segment["start"],
             "end": segment["end"],
-            "final_text": text,
+            "final_text": final_text,
             "sped_up": False,
             "truncated": was_truncated,
+            "reformulated": final_text != text,
             "final_duration": round(actual_duration, 3),
             "slot_duration": round(effective_duration, 3),
             "overflow": round(overflow_secs, 3),
@@ -264,6 +297,7 @@ class TimeSync:
         sped_up_count = 0
         truncated_count = 0
         overflow_count = 0  # Audio overflows slot (crossfade handles)
+        reformulated_count = 0
         sped_up_list = []
         truncated_list = []
         overflow_list = []
@@ -289,6 +323,8 @@ class TimeSync:
             elif res.get("overflow", 0) > 0.05:  # >50ms overflow (not truncated but will crossfade)
                 overflow_count += 1
                 overflow_list.append(f"[{seg['start']:.1f}-{seg['end']:.1f}] +{res['overflow']:.2f}s")
+            if res.get("reformulated"):
+                reformulated_count += 1
         
         cut_total = truncated_count + overflow_count
         stats = {
@@ -296,6 +332,7 @@ class TimeSync:
             "sped_up": sped_up_count,
             "truncated": truncated_count,
             "overflow": overflow_count,
+            "reformulated": reformulated_count,
             "cut_total": cut_total,
             "perfect": len(segments) - sped_up_count - cut_total,
             "sped_up_segments": sped_up_list,
@@ -331,6 +368,21 @@ class TimeSync:
                     "tts_duration": 0.0
                 })
                 continue
+
+            # Check if synced/cached never-cut audio already exists
+            synced_path = os.path.join(TEMP_DIR, f"nc_seg_{seg['start']:.2f}_synced.wav")
+            if os.path.exists(synced_path):
+                try:
+                    info = sf.info(synced_path)
+                    results.append({
+                        **seg,
+                        "tts_path": synced_path,
+                        "tts_duration": info.duration
+                    })
+                    print(f"[NeverCut] Seg [{seg['start']:.1f}-{seg['end']:.1f}]: Reusing cached synced audio ({info.duration:.2f}s)")
+                    continue
+                except Exception as e:
+                    print(f"Failed to read cached never-cut audio info: {e}. Re-generating...")
 
             voice = None
             if voice_mapping:
@@ -490,16 +542,17 @@ class TimeSync:
         synced_segments = []
         for seg in placed:
             tts_path = seg.get("tts_path")
+            synced_path = os.path.join(TEMP_DIR, f"nc_seg_{seg['start']:.2f}_synced.wav")
 
-            if tts_path and os.path.exists(tts_path):
+            if tts_path == synced_path and os.path.exists(synced_path):
+                # Already resampled and cached
+                pass
+            elif tts_path and os.path.exists(tts_path):
                 # Resample to target SR
                 audio, sr = sf.read(tts_path)
                 audio, sr = self._resample_to_target(audio, sr)
                 if audio.ndim > 1:
                     audio = audio.mean(axis=1)
-
-                # Save resampled version
-                synced_path = os.path.join(TEMP_DIR, f"nc_seg_{seg['start']:.2f}_synced.wav")
                 sf.write(synced_path, audio, sr)
             else:
                 synced_path = None

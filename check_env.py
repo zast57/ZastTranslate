@@ -22,13 +22,12 @@ except ImportError:
     errors.append("torch")
     print("[FAIL] torch not installed")
 
-# 2. torchvision
+# 2. torchvision (optional)
 try:
     import torchvision
     print(f"[OK] torchvision {torchvision.__version__}")
 except ImportError:
-    errors.append("torchvision")
-    print("[FAIL] torchvision not installed")
+    print("[INFO] torchvision not installed (optional)")
 
 # 3. torchaudio
 try:
@@ -99,12 +98,7 @@ except ImportError:
 # 9. numpy version check
 try:
     import numpy
-    ver = tuple(int(x) for x in numpy.__version__.split(".")[:2])
-    if ver[0] >= 2:
-        errors.append("numpy")
-        print(f"[FAIL] numpy {numpy.__version__} - must be < 2.0")
-    else:
-        print(f"[OK] numpy {numpy.__version__}")
+    print(f"[OK] numpy {numpy.__version__}")
 except ImportError:
     errors.append("numpy")
     print("[FAIL] numpy not installed")

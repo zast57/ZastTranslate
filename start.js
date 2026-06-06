@@ -30,7 +30,8 @@ module.exports = {
                 venv: "env",
                 path: ".",
                 env: {
-                    "PYTHONDONTWRITEBYTECODE": "1"
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    "PYTHONUNBUFFERED": "1"
                 },
                 message: [
                     "python app.py",
