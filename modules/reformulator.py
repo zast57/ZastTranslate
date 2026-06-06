@@ -98,6 +98,10 @@ class Reformulator:
             r"^translated\s*(sentence|text)?\s*:\s*",
             r"^voici\s+(la|ma)?\s*traduction.*?:\s*",
             r"^traduction\s*:\s*",
+            r"^перевод\s*:\s*",
+            r"^вот\s+(мой\s+)?перевод\s*:\s*",
+            r"^übersetzung\s*:\s*",
+            r"^hier\s+ist\s+die\s+übersetzung\s*:\s*",
         ]
         lines = response.strip().split('\n')
         # If first line matches a meta-pattern, skip it
@@ -474,11 +478,19 @@ Shortened ({target_chars} chars max):"""
         target_lang = self._language_name(target_lang_code)
         source_lang = self._source_language_name(source_lang_code)
         
-        prompt = f"Translate the following text from {source_lang} to {target_lang}.\nCRITICAL INSTRUCTION: Output ONLY the {target_lang} translation. DO NOT output your internal reasoning, DO NOT output 'Thinking Process:', and do not include any quotes or explanations.\n\nText to translate:\n{text}"
-        
         messages = [
-            {"role": "system", "content": f"You are a professional translator. Translate from {source_lang} to {target_lang}. Output ONLY the raw translation. NEVER output a 'Thinking Process'."},
-            {"role": "user", "content": prompt}
+            {
+                "role": "system",
+                "content": (
+                    f"You are a professional translator. Translate the user's input text from {source_lang} to {target_lang}.\n"
+                    f"CRITICAL RULES:\n"
+                    f"- Output ONLY the translated text, nothing else.\n"
+                    f"- DO NOT output your internal reasoning, and DO NOT output 'Thinking Process:'.\n"
+                    f"- DO NOT include any introduction, explanations, notes, or quotes.\n"
+                    f"- Translate the text exactly as provided by the user, preserving all formatting and paragraphs."
+                )
+            },
+            {"role": "user", "content": text}
         ]
         
         result = self._generate(messages, max_new_tokens=4096, multiline=True)

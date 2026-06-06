@@ -985,7 +985,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         with open(_logo_path, "rb") as _f:
             _logo_b64 = _b64.b64encode(_f.read()).decode()
         _logo_html = f"<center><img src='data:image/png;base64,{_logo_b64}' width='80' /></center>\n\n"
-    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.03\n**Offline video translation & dubbing (No Lip-Sync)**")
+    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.04\n**Offline video translation & dubbing (No Lip-Sync)**")
     
     with gr.Tab("1. Import"):
         url_input = gr.Textbox(label="YouTube URL", placeholder="https://www.youtube.com/watch?v=...")

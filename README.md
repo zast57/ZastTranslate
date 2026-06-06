@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 1.03
+# ZastTranslate — Beta 1.04
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ℹ️ **Beta 1.03**: Voice cloning stability improvements (surgical extraction), "Persistent Default Voice" to prevent Voice Design hallucinations, and a new option to select the Default Voice Gender (Man / Woman). Tested on **Windows only**. Some features may change.
+> ℹ️ **Beta 1.04**: Fixed system prompt/instruction leakages in Russian and German metadata translations, and added translation meta-comment cleaners. Tested on **Windows only**. Some features may change.
 
 Translate any video into 33 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -249,6 +249,9 @@ MIT
 
 ## History
 
+- **Beta 1.04**
+  - **Metadata Translation Prompt Fixes**: Resolved system instruction leakages in Russian and German metadata translations (Original Video Title and Description) by moving instruction rules entirely to the system role and passing only the raw text to the user role.
+  - **Meta-Comment Cleaners**: Added fallback pattern-matching filters for translated headers and meta-comments (like `Перевод:` and `Übersetzung:`) to strip them automatically if generated.
 - **Beta 1.03**
   - **Voice Cloning Stability**: Replaced indiscriminate 30s trimming with a surgical reference extraction strategy, choosing the cleanest 5-15s segment. Prevents artifacts and background noise during voice cloning.
   - **Persistent Default Voice**: Solved Voice Design hallucination where a new random voice was generated for every sentence when cloning was disabled. The system now caches a high-quality persistent default voice (`default_man.wav` or `default_woman.wav`).
