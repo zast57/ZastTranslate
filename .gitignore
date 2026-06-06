@@ -68,3 +68,7 @@ QWEN.md
 .idea/
 .vscode/
 *.swp
+
+# Credentials and secrets
+client_secret.json
+*.json.oauth2

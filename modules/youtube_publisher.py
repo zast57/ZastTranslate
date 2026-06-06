@@ -1,9 +1,14 @@
 import os
 import pickle
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+
+try:
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+    HAS_GOOGLE_API = True
+except ImportError:
+    HAS_GOOGLE_API = False
 
 SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl']
 
@@ -21,6 +26,13 @@ class YouTubePublisher:
 
     def authenticate(self):
         """Authenticate via OAuth2 and build the youtube service."""
+        if not HAS_GOOGLE_API:
+            raise ImportError(
+                "Missing Google API client libraries. "
+                "Please run the 'Install' or 'Update' step in Pinokio to install the required dependencies: "
+                "pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib"
+            )
+
         if not self.is_configured():
             raise FileNotFoundError(f"Missing {self.client_secrets_file}. Please download it from Google Cloud Console.")
 
