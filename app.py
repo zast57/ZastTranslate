@@ -152,14 +152,17 @@ def reset_project():
         "",           # url_input
         None,         # file_input
         "Ready for a new project.",  # status_dl
-        None,         # video_preview
+        gr.update(visible=True, value=None),  # video_preview
+        gr.update(visible=False, value=None), # audio_preview
         gr.Button(interactive=False),  # btn_transcribe
         gr.Button(interactive=False),  # btn_translate
         gr.Button(interactive=False),  # btn_synth
         gr.Button(interactive=False),  # btn_bulk_run
         gr.update(visible=False),      # btn_import_metadata
         gr.update(visible=False),      # btn_youtube_publish
-        gr.update(visible=False, value="") # bulk_publish_status
+        gr.update(visible=False, value=""), # bulk_publish_status
+        gr.update(value="Video + Audio", choices=["Video + Audio", "Audio Only"]), # bulk_output_type
+        gr.update(visible=True, value=None) # final_video_out
     )
 
 
@@ -185,16 +188,23 @@ def step0_check_url(url):
 def step1_download(url, local_file, resolution, progress=gr.Progress()):
     progress(0, "Downloading...")
     try:
+        is_audio = False
         if url:
             info = downloader.download(url, resolution=resolution)
             show_btn = gr.update(visible=True)
         elif local_file:
-            info = downloader.import_local(local_file)
+            filepath = local_file.name if hasattr(local_file, 'name') else local_file
+            ext = os.path.splitext(filepath)[1].lower()
+            if ext in [".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac"]:
+                is_audio = True
+            info = downloader.import_local(filepath)
             show_btn = gr.update(visible=False)
         else:
             raise ValueError("Please provide a YouTube URL or a local file.")
         
+        info['is_audio_only'] = is_audio
         state.video_info = info
+        
         if info.get('youtube_id'):
             show_publish_btn = gr.update(visible=True)
             show_publish_status = gr.update(visible=True, value="")
@@ -202,9 +212,42 @@ def step1_download(url, local_file, resolution, progress=gr.Progress()):
             show_publish_btn = gr.update(visible=False)
             show_publish_status = gr.update(visible=False)
 
-        return f"Video loaded: {info['title']}", info['video_path'], gr.Button(interactive=True), show_btn, show_publish_btn, show_publish_status
+        if is_audio:
+            return (
+                f"Audio loaded: {info['title']}",
+                gr.update(visible=False, value=None),
+                gr.update(visible=True, value=info['video_path']),
+                gr.update(interactive=True),
+                show_btn,
+                show_publish_btn,
+                show_publish_status,
+                gr.update(value="Audio Only", choices=["Audio Only"]),
+                gr.update(visible=False, value=None)
+            )
+        else:
+            return (
+                f"Video loaded: {info['title']}",
+                gr.update(visible=True, value=info['video_path']),
+                gr.update(visible=False, value=None),
+                gr.update(interactive=True),
+                show_btn,
+                show_publish_btn,
+                show_publish_status,
+                gr.update(value="Video + Audio", choices=["Video + Audio", "Audio Only"]),
+                gr.update(visible=True, value=None)
+            )
     except Exception as e:
-        return f"Error: {str(e)}", None, gr.Button(interactive=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
+        return (
+            f"Error: {str(e)}",
+            None,
+            None,
+            gr.Button(interactive=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="Video + Audio", choices=["Video + Audio", "Audio Only"]),
+            gr.update(visible=True)
+        )
 
 
 
@@ -662,22 +705,24 @@ def step6_synthesize(voice_mode, voice_file, never_cut, default_voice_gender="Wo
     mixed_audio = os.path.join(TEMP_DIR, "final_mix.wav")
     audio_mixer.mix(full_audio, state.video_info['background'], mixed_audio)
     
-    progress(0.9, "Assembling final video...")
     tgt_lang = state.video_info.get('target_language', '') if state.video_info else ''
     iso = _get_iso_code(tgt_lang)
-    
-    final_video = os.path.join(OUTPUT_DIR, f"final_video_{iso}.mp4")
-    video_assembler.assemble(
-        state.video_info['video_path'], 
-        mixed_audio, 
-        final_video
-    )
     
     # Copy final audio to output dir for easy export
     final_audio_export = os.path.join(OUTPUT_DIR, f"final_audio_{iso}.wav")
     shutil.copy2(mixed_audio, final_audio_export)
     
-    return status, final_video, mixed_audio
+    if state.video_info.get('is_audio_only', False):
+        return status, gr.update(visible=False, value=None), mixed_audio
+    else:
+        progress(0.9, "Assembling final video...")
+        final_video = os.path.join(OUTPUT_DIR, f"final_video_{iso}.mp4")
+        video_assembler.assemble(
+            state.video_info['video_path'], 
+            mixed_audio, 
+            final_video
+        )
+        return status, gr.update(visible=True, value=final_video), mixed_audio
 
 
 def export_audio():
@@ -888,7 +933,7 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         output_files.append(final_audio_export)
 
         # --- VIDEO ASSEMBLY PHASE ---
-        if output_type == "Video + Audio":
+        if output_type == "Video + Audio" and not state.video_info.get('is_audio_only', False):
             yield f"[{idx+1}/{total_langs}] Assembling Video {target_lang}...", output_files, metadata_display
             progress(base_progress + prog_step * 0.9, f"[{target_lang}] Mixed video assembly...")
             
@@ -985,7 +1030,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         with open(_logo_path, "rb") as _f:
             _logo_b64 = _b64.b64encode(_f.read()).decode()
         _logo_html = f"<center><img src='data:image/png;base64,{_logo_b64}' width='80' /></center>\n\n"
-    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.04\n**Offline video translation & dubbing (No Lip-Sync)**")
+    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.05\n**Offline video translation & dubbing (No Lip-Sync)**")
     
     with gr.Tab("1. Import"):
         url_input = gr.Textbox(label="YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
@@ -998,15 +1043,19 @@ with gr.Blocks(title="ZastTranslate") as app:
             tts_backend_dropdown = gr.Dropdown(
                 choices=list(available_tts_backends.keys()),
                 value=current_tts_backend,
-                label="Modèle TTS (Voix)",
+                label="TTS Model (Voice)",
                 interactive=True
             )
-        file_input = gr.File(label="Or upload a local video file", file_types=[".mp4", ".mkv", ".avi", ".mov", ".webm"])
+        file_input = gr.File(
+            label="Or upload a local video or audio file", 
+            file_types=[".mp4", ".mkv", ".avi", ".mov", ".webm", ".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac"]
+        )
         with gr.Row():
-            btn_dl = gr.Button("Import Video", variant="primary")
+            btn_dl = gr.Button("Import Video or Audio", variant="primary")
             btn_reset = gr.Button("New Project", variant="secondary")
         status_dl = gr.Textbox(label="Status", interactive=False)
         video_preview = gr.Video(label="Preview", height=300)
+        audio_preview = gr.Audio(label="Audio Preview", visible=False)
         
     with gr.Tab("2. Transcription"):
         with gr.Row():
@@ -1020,7 +1069,7 @@ with gr.Blocks(title="ZastTranslate") as app:
             llm_backend_dropdown = gr.Dropdown(
                 choices=list(available_llm_backends.keys()),
                 value=current_llm_backend,
-                label="Modèle LLM (Traduction)",
+                label="LLM Model (Translation)",
                 interactive=True
             )
 
@@ -1152,15 +1201,16 @@ with gr.Blocks(title="ZastTranslate") as app:
         
         with gr.Accordion("📥 Tab 1 — Import", open=False):
             gr.Markdown(
-                "Load your video from one of two sources:\n\n"
+                "Load your video or audio file from one of these sources:\n\n"
                 "- **YouTube URL** — Paste any YouTube link. The video is downloaded automatically via yt-dlp.\n"
-                "- **Local file** — Upload a video from your computer. Supported formats: **MP4, MKV, AVI, MOV, WebM**.\n\n"
-                "Click **Import Video** to start. A preview will appear below.\n"
+                "- **Local file** — Upload a video (MP4, MKV, AVI, MOV, WebM) or audio (MP3, WAV, M4A, FLAC, OGG, AAC) file from your computer.\n\n"
+                "Click **Import Video or Audio** to start. A video or audio player preview will appear below depending on the file type.\n"
                 "Use **New Project** to clear everything and start over.\n\n"
                 "**YouTube resolution:** Click **🔍 Check URL** to see available resolutions before downloading. "
-                "Select the desired quality and click **Import Video**.\n\n"
+                "Select the desired quality and click **Import Video or Audio**.\n\n"
                 "🗑️ **New Project** clears all data and deletes temporary files (downloads, audio, separated tracks) to free disk space.\n\n"
-                "💡 iPhone videos (.MOV with HEVC codec) are supported — they're automatically converted for browser playback."
+                "💡 iPhone videos (.MOV with HEVC codec) are supported — they're automatically converted for browser playback.\n"
+                "💡 Audio files are automatically processed without video packaging (audio-only outputs in Dubbing and Bulk Mode)."
             )
         
         with gr.Accordion("🎤 Tab 2 — Transcription", open=False):
@@ -1316,8 +1366,8 @@ with gr.Blocks(title="ZastTranslate") as app:
 
     # EVENTS
     btn_check.click(step0_check_url, [url_input], [status_dl, yt_resolution, btn_dl])
-    btn_dl.click(step1_download, [url_input, file_input, yt_resolution], [status_dl, video_preview, btn_transcribe, btn_import_metadata, btn_youtube_publish, bulk_publish_status])
-    btn_reset.click(reset_project, [], [url_input, file_input, status_dl, video_preview, btn_transcribe, btn_translate, btn_synth, btn_bulk_run, btn_import_metadata, btn_youtube_publish, bulk_publish_status])
+    btn_dl.click(step1_download, [url_input, file_input, yt_resolution], [status_dl, video_preview, audio_preview, btn_transcribe, btn_import_metadata, btn_youtube_publish, bulk_publish_status, bulk_output_type, final_video_out])
+    btn_reset.click(reset_project, [], [url_input, file_input, status_dl, video_preview, audio_preview, btn_transcribe, btn_translate, btn_synth, btn_bulk_run, btn_import_metadata, btn_youtube_publish, bulk_publish_status, bulk_output_type, final_video_out])
     
     btn_transcribe.click(step2_transcribe, [lang_source, model_size], [transcription_status, transcription_df])
     btn_import_srt.click(step2b_import_srt, [srt_file_input, lang_source], [transcription_status, transcription_df])

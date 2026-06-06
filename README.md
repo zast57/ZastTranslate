@@ -2,17 +2,17 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 1.04
+# ZastTranslate — Beta 1.05
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ℹ️ **Beta 1.04**: Fixed system prompt/instruction leakages in Russian and German metadata translations, and added translation meta-comment cleaners. Tested on **Windows only**. Some features may change.
+> ℹ️ **Beta 1.05**: Added support for local audio file import (MP3, WAV, etc.), auto-adapting layouts and outputs to audio-only mode, and skipping video assembly for pure audio projects. Tested on **Windows only**. Some features may change.
 
 Translate any video into 33 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
 ## Features
 
-- 🎬 **Input**: YouTube URL (with resolution picker) or local video file
+- 🎬 **Input**: YouTube URL (with resolution picker), local video, or local audio file (MP3, WAV, etc.)
 - 🎙️ **Transcription**: WhisperX with word-level timestamps — 20+ source languages
 - 🌍 **Multi-Backend Translation**: Choose between Qwen2.5-7B, Qwen3.5-9B, or EuroLLM-9B
 - 🗣️ **Voice Synthesis**: Powered by **VoxCPM 2** — 30 languages, per-language CPS calibration, with a dynamic factory ready to accept future engines.
@@ -249,6 +249,9 @@ MIT
 
 ## History
 
+- **Beta 1.05**
+  - **Local Audio Support**: Added the ability to upload local audio files (MP3, WAV, M4A, etc.) in the Import tab.
+  - **Adaptive Output & Layouts**: Toggles between video and audio player previews dynamically. If an audio file is imported, Dubbing and Export skips video packaging, and Bulk Mode automatically locks the output generation choice to "Audio Only".
 - **Beta 1.04**
   - **Metadata Translation Prompt Fixes**: Resolved system instruction leakages in Russian and German metadata translations (Original Video Title and Description) by moving instruction rules entirely to the system role and passing only the raw text to the user role.
   - **Meta-Comment Cleaners**: Added fallback pattern-matching filters for translated headers and meta-comments (like `Перевод:` and `Übersetzung:`) to strip them automatically if generated.

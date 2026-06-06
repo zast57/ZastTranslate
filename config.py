@@ -63,15 +63,15 @@ MP3_BITRATE = "320k"
 # Full list covering VoxCPM2 (30 langs) + Qwen3-TTS (10 langs)
 # The UI dynamically filters based on selected TTS + LLM backend capabilities
 LANGUAGES = {
-    "Francais": "fra_Latn",
+    "French": "fra_Latn",
     "English": "eng_Latn",
-    "Espanol": "spa_Latn",
-    "Deutsch": "deu_Latn",
-    "Italiano": "ita_Latn",
-    "Portugues": "por_Latn",
+    "Spanish": "spa_Latn",
+    "German": "deu_Latn",
+    "Italian": "ita_Latn",
+    "Portuguese": "por_Latn",
     "Japanese": "jpn_Jpan",
     "Korean": "kor_Hang",
-    "Chinese (Simplifie)": "zho_Hans",
+    "Chinese": "zho_Hans",
     "Russian": "rus_Cyrl",
     "Arabic": "arb_Arab",
     "Hindi": "hin_Deva",
