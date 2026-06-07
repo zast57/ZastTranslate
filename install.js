@@ -83,7 +83,7 @@ module.exports = {
                     "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
                     "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
                 },
-                message: "uv pip install flash-attn --no-build-isolation || echo FlashAttention not available - will use default attention"
+                message: "uv pip install wheel && uv pip install flash-attn --no-build-isolation || echo FlashAttention not available - will use default attention"
             }
         },
 
