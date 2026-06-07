@@ -4,7 +4,7 @@ module.exports = {
   description: "Video translation & dubbing with voice cloning — 100% local, zero API. Supports 30 languages (VoxCPM 2) with per-language CPS calibration, automatic transcription, translation, and AI dubbing.",
   icon: "zastttranslate.png",
   menu: async (kernel, info) => {
-    let installed = info.exists("env")
+    let installed = info.exists("env/installed.sentinel")
     let running = {
       install: info.running("install.js"),
       start: info.running("start.js"),

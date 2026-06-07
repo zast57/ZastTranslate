@@ -8,9 +8,14 @@ module.exports = {
             params: {
                 venv: "env",
                 path: ".",
+                env: {
+                    "UV_NATIVE_TLS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
                 message: [
-                    "pip install gradio",
-                    "pip install -r requirements.txt"
+                    "uv pip install gradio",
+                    "uv pip install -r requirements.txt"
                 ]
             }
         },
@@ -31,7 +36,12 @@ module.exports = {
             params: {
                 venv: "env",
                 path: ".",
-                message: "pip install qwen-tts --no-deps"
+                env: {
+                    "UV_NATIVE_TLS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
+                message: "uv pip install qwen-tts --no-deps"
             }
         },
         // 4. Install SoX binary (required by qwen-tts for audio processing)
@@ -40,6 +50,11 @@ module.exports = {
             params: {
                 venv: "env",
                 path: ".",
+                env: {
+                    "UV_NATIVE_TLS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
                 message: "conda install -y -c conda-forge sox"
             }
         },
@@ -49,7 +64,12 @@ module.exports = {
             params: {
                 venv: "env",
                 path: ".",
-                message: "pip install sox soundfile safetensors huggingface_hub tokenizers"
+                env: {
+                    "UV_NATIVE_TLS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
+                message: "uv pip install sox soundfile safetensors huggingface_hub tokenizers"
             }
         },
         // 6. Try installing flash-attn (optional, speeds up TTS inference)
@@ -58,7 +78,12 @@ module.exports = {
             params: {
                 venv: "env",
                 path: ".",
-                message: "pip install flash-attn --no-build-isolation || echo FlashAttention not available - will use default attention"
+                env: {
+                    "UV_NATIVE_TLS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
+                message: "uv pip install flash-attn --no-build-isolation || echo FlashAttention not available - will use default attention"
             }
         },
 
@@ -69,6 +94,11 @@ module.exports = {
             params: {
                 venv: "env",
                 path: ".",
+                env: {
+                    "UV_NATIVE_TLS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
                 message: [
                     "python check_env.py",
                     "python -c \"import torch; print('torch', torch.__version__, 'CUDA' if torch.cuda.is_available() else 'CPU')\"",
@@ -77,7 +107,15 @@ module.exports = {
                 ]
             }
         },
-        // 8. Done
+        // 8. Write sentinel file to indicate success
+        {
+            method: "fs.write",
+            params: {
+                path: "env/installed.sentinel",
+                text: "success"
+            }
+        },
+        // 9. Done
         {
             method: "notify",
             params: {

@@ -7,9 +7,14 @@ module.exports = {
             "params": {
                 "venv": "{{args && args.venv ? args.venv : null}}",
                 "path": "{{args && args.path ? args.path : '.'}}",
+                "env": {
+                    "UV_NATIVE_TLS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
                 "message": [
-                    "pip install typing-extensions>=4.10.0",
-                    "pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126 --force-reinstall --no-deps"
+                    "uv pip install typing-extensions>=4.10.0",
+                    "uv pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126 --force-reinstall --no-deps"
                 ]
             },
             "next": null
@@ -21,6 +26,11 @@ module.exports = {
             "params": {
                 "venv": "{{args && args.venv ? args.venv : null}}",
                 "path": "{{args && args.path ? args.path : '.'}}",
+                "env": {
+                    "UV_NATIVE_TLS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
                 "message": [
                     "uv pip install typing-extensions>=4.10.0",
                     "uv pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126 --force-reinstall --no-deps"
@@ -35,9 +45,14 @@ module.exports = {
             "params": {
                 "venv": "{{args && args.venv ? args.venv : null}}",
                 "path": "{{args && args.path ? args.path : '.'}}",
+                "env": {
+                    "UV_NATIVE_TLS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
                 "message": [
-                    "pip install typing-extensions>=4.10.0",
-                    "pip install torch==2.8.0 torchaudio==2.8.0"
+                    "uv pip install typing-extensions>=4.10.0",
+                    "uv pip install torch==2.8.0 torchaudio==2.8.0"
                 ]
             },
             "next": null
@@ -48,9 +63,14 @@ module.exports = {
             "params": {
                 "venv": "{{args && args.venv ? args.venv : null}}",
                 "path": "{{args && args.path ? args.path : '.'}}",
+                "env": {
+                    "UV_NATIVE_TLS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
                 "message": [
-                    "pip install typing-extensions>=4.10.0",
-                    "pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu"
+                    "uv pip install typing-extensions>=4.10.0",
+                    "uv pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu"
                 ]
             }
         }
