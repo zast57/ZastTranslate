@@ -1,5 +1,13 @@
 module.exports = {
     run: [
+        // 0. Write temporary overrides file to resolve whisperx vs transformers conflicts
+        {
+            method: "fs.write",
+            params: {
+                path: "overrides.txt",
+                text: "huggingface-hub>=0.25.0"
+            }
+        },
         // 1. Create venv and install initial dependencies (gradio + requirements.txt)
         // NOTE: whisperx pins torch~=2.8.0 which installs CPU-only torch from PyPI.
         // We MUST install requirements first, then override with CUDA torch in step 2.
@@ -15,7 +23,7 @@ module.exports = {
                 },
                 message: [
                     "uv pip install gradio",
-                    "uv pip install -r requirements.txt"
+                    "uv pip install -r requirements.txt --override overrides.txt"
                 ]
             }
         },
@@ -116,7 +124,14 @@ module.exports = {
                 text: "success"
             }
         },
-        // 9. Done
+        // 9. Clean up overrides file
+        {
+            method: "fs.rm",
+            params: {
+                path: "overrides.txt"
+            }
+        },
+        // 10. Done
         {
             method: "notify",
             params: {

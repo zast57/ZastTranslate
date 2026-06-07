@@ -53,6 +53,7 @@ ZastTranslate_SPEC.md
 user_cps_config.json
 dbg_output.txt
 test_qwen_out.txt
+overrides.txt
 
 # AI agent config files
 AGENTS.md
