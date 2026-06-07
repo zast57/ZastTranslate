@@ -74,6 +74,7 @@ module.exports = {
         },
         // 6. Try installing flash-attn (optional, speeds up TTS inference)
         {
+            when: "{{platform !== 'win32'}}",
             method: "shell.run",
             params: {
                 venv: "env",
