@@ -12,7 +12,7 @@ module.exports = {
             method: "fs.write",
             params: {
                 path: "overrides.txt",
-                text: "huggingface-hub>=0.25.0"
+                text: "huggingface-hub>=0.25.0\ntransformers==4.57.3"
             }
         },
         // 2. Update Python dependencies
