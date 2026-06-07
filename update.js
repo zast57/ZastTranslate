@@ -23,6 +23,7 @@ module.exports = {
                 path: ".",
                 env: {
                     "UV_NATIVE_TLS": "true",
+                    "UV_SYSTEM_CERTS": "true",
                     "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
                     "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
                 },
@@ -39,6 +40,7 @@ module.exports = {
                 path: ".",
                 env: {
                     "UV_NATIVE_TLS": "true",
+                    "UV_SYSTEM_CERTS": "true",
                     "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
                     "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
                 },

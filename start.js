@@ -22,10 +22,11 @@ module.exports = {
                 path: ".",
                 env: {
                     "UV_NATIVE_TLS": "true",
+                    "UV_SYSTEM_CERTS": "true",
                     "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
                     "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
                 },
-                message: ["uv pip install -U yt-dlp"]
+                message: ["uv pip install -U yt-dlp || echo yt-dlp update skipped"]
             }
         },
         // Launch app with no bytecode caching
@@ -42,7 +43,7 @@ module.exports = {
                     "python app.py",
                 ],
                 on: [{
-                    "event": "/(http:\\/\\/\\S+)/",
+                    "event": "/(http:\\/\\/[0-9.:]+)/",
                     "done": true
                 }]
             }
