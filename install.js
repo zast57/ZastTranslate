@@ -39,7 +39,7 @@ module.exports = {
                 }
             }
         },
-        // 3. Install Qwen3-TTS (--no-deps to avoid pulling its own torch)
+        // 3. Install VoxCPM 2 (sole TTS and voice cloning backend)
         {
             method: "shell.run",
             params: {
@@ -51,37 +51,7 @@ module.exports = {
                     "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
                     "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
                 },
-                message: "uv pip install qwen-tts --no-deps"
-            }
-        },
-        // 4. Install SoX binary (required by qwen-tts for audio processing)
-        {
-            method: "shell.run",
-            params: {
-                venv: "env",
-                path: ".",
-                env: {
-                    "UV_NATIVE_TLS": "true",
-                    "UV_SYSTEM_CERTS": "true",
-                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
-                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
-                },
-                message: "conda install -y -c conda-forge sox"
-            }
-        },
-        // 5. Install Qwen3-TTS non-torch dependencies
-        {
-            method: "shell.run",
-            params: {
-                venv: "env",
-                path: ".",
-                env: {
-                    "UV_NATIVE_TLS": "true",
-                    "UV_SYSTEM_CERTS": "true",
-                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
-                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
-                },
-                message: "uv pip install sox soundfile safetensors huggingface_hub tokenizers"
+                message: "uv pip install voxcpm"
             }
         },
         // 6. Try installing flash-attn (optional, speeds up TTS inference)
@@ -117,7 +87,7 @@ module.exports = {
                 message: [
                     "python check_env.py",
                     "python -c \"import torch; print('torch', torch.__version__, 'CUDA' if torch.cuda.is_available() else 'CPU')\"",
-                    "python -c \"from qwen_tts import Qwen3TTSModel; print('Qwen3-TTS OK')\"",
+                    "python -c \"import voxcpm; print('VoxCPM 2 OK')\"",
                     "python -c \"import bitsandbytes; print('bitsandbytes', bitsandbytes.__version__, 'OK')\""
                 ]
             }

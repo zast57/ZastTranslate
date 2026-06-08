@@ -13,7 +13,7 @@ numpy>=2.2.2
 ffmpeg-python>=0.2.0
 accelerate>=0.25.0
 bitsandbytes>=0.43.0
-# qwen-tts installed separately via tts_install.js (avoids dependency conflicts)
+voxcpm
 
 # YouTube API Integration
 google-api-python-client>=2.0.0

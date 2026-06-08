@@ -127,14 +127,14 @@ except ImportError:
     errors.append("accelerate")
     print("[FAIL] accelerate not installed")
 
-# 13. Qwen3-TTS (optional)
+# 13. VoxCPM 2 (Required)
 print("-" * 50)
 try:
-    from qwen_tts import Qwen3TTSModel
-    print(f"[OK] qwen-tts (voice cloning available)")
+    import voxcpm
+    print(f"[OK] voxcpm (voice cloning available)")
 except ImportError:
-    print("[INFO] qwen-tts not installed (voice cloning disabled)")
-    print("  Run 'Install Voice Cloning (Qwen3-TTS)' from menu")
+    errors.append("voxcpm")
+    print("[FAIL] voxcpm not installed")
 
 # Summary
 print("=" * 50)
