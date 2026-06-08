@@ -51,7 +51,7 @@ module.exports = {
                     "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
                     "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
                 },
-                message: "uv pip install voxcpm"
+                message: "uv pip install \"voxcpm>=2.0.2\""
             }
         },
         // 6. Try installing flash-attn (optional, speeds up TTS inference)
