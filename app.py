@@ -741,9 +741,13 @@ def export_transcription_srt():
         return "No transcription to export.", None
     src_lang = state.video_info.get('detected_language', 'fr') if state.video_info else 'fr'
     iso = _get_iso_code(src_lang)
-    srt_path = os.path.join(TEMP_DIR, f"transcription_{iso}.srt")
+    srt_path = os.path.join(OUTPUT_DIR, f"transcription_{iso}.srt")
     srt_parser.segments_to_clean_srt(state.segments, srt_path, text_key="text", lang_code=src_lang, clean_fillers=True)
-    return f"Exported {len(state.segments)} segments (clean & wrapped).", srt_path
+    try:
+        shutil.copy2(srt_path, os.path.join(TEMP_DIR, f"transcription_{iso}.srt"))
+    except Exception:
+        pass
+    return f"Exported {len(state.segments)} segments to output/{os.path.basename(srt_path)}.", srt_path
 
 def export_translation_srt():
     """Export normal/full translation as clean & ergonomically wrapped SRT file."""
@@ -751,9 +755,13 @@ def export_translation_srt():
         return "No translation to export.", None
     tgt_lang = state.video_info.get('target_language', 'en') if state.video_info else 'en'
     iso = _get_iso_code(tgt_lang)
-    srt_path = os.path.join(TEMP_DIR, f"translation_{iso}.srt")
+    srt_path = os.path.join(OUTPUT_DIR, f"translation_{iso}.srt")
     srt_parser.segments_to_clean_srt(state.translated_segments, srt_path, text_key="normal_text", lang_code=tgt_lang, clean_fillers=False)
-    return f"Exported {len(state.translated_segments)} segments (full translation).", srt_path
+    try:
+        shutil.copy2(srt_path, os.path.join(TEMP_DIR, f"translation_{iso}.srt"))
+    except Exception:
+        pass
+    return f"Exported {len(state.translated_segments)} segments to output/{os.path.basename(srt_path)}.", srt_path
 
 def export_fitted_srt():
     """Export fitted/concise translation as clean & ergonomically wrapped SRT file (used for dubbing)."""
@@ -761,9 +769,13 @@ def export_fitted_srt():
         return "No translation to export.", None
     tgt_lang = state.video_info.get('target_language', 'en') if state.video_info else 'en'
     iso = _get_iso_code(tgt_lang)
-    srt_path = os.path.join(TEMP_DIR, f"fitted_{iso}.srt")
+    srt_path = os.path.join(OUTPUT_DIR, f"fitted_{iso}.srt")
     srt_parser.segments_to_clean_srt(state.translated_segments, srt_path, text_key="translated_text", lang_code=tgt_lang, clean_fillers=False)
-    return f"Exported {len(state.translated_segments)} segments (fitted for dubbing).", srt_path
+    try:
+        shutil.copy2(srt_path, os.path.join(TEMP_DIR, f"fitted_{iso}.srt"))
+    except Exception:
+        pass
+    return f"Exported {len(state.translated_segments)} segments to output/{os.path.basename(srt_path)}.", srt_path
 
 def ensure_vocals_and_reference_audio():
     if not state.video_info:
@@ -1735,6 +1747,7 @@ with gr.Blocks(title="ZastTranslate") as app:
                     btn_valid_transcription = gr.Button("Validate Transcription ✅", variant="primary")
                     btn_clean_transcription = gr.Button("🧹 Clean Fillers & Oral Tics", variant="secondary")
                     btn_export_transcription = gr.Button("Export SRT 💾", variant="secondary")
+                    btn_open_output_tab2 = gr.Button("📂 Open Folder", variant="secondary")
                 export_transcription_file = gr.File(label="Download SRT")
         
             with gr.Tab("3. Translation") as tab3:
@@ -1765,6 +1778,7 @@ with gr.Blocks(title="ZastTranslate") as app:
                     btn_valid_translation = gr.Button("Validate Translation ✅", variant="primary")
                     btn_export_translation = gr.Button("Export Translation SRT 💾", variant="secondary")
                     btn_export_fitted = gr.Button("Export Fitted SRT 💾", variant="secondary")
+                    btn_open_output_tab3 = gr.Button("📂 Open Folder", variant="secondary")
                 export_translation_file = gr.File(label="Download SRT")
                 
             with gr.Tab("4. Dubbing & Export") as tab4:
@@ -2150,6 +2164,7 @@ with gr.Blocks(title="ZastTranslate") as app:
     btn_valid_transcription.click(step3_save_transcription, [transcription_df], [transcription_status, btn_translate, btn_bulk_run, segments_json_holder])
     btn_clean_transcription.click(step2_clean_transcription, [transcription_df, lang_source], [transcription_status, transcription_df, segments_json_holder], show_progress="full")
     btn_export_transcription.click(export_transcription_srt, [], [transcription_status, export_transcription_file])
+    btn_open_output_tab2.click(open_output_folder, [], [])
     
     btn_import_metadata_single.click(import_metadata_from_state, [], [original_title_input, original_desc_input])
     
@@ -2167,6 +2182,7 @@ with gr.Blocks(title="ZastTranslate") as app:
     )
     btn_export_translation.click(export_translation_srt, [], [translation_status, export_translation_file])
     btn_export_fitted.click(export_fitted_srt, [], [translation_status, export_translation_file])
+    btn_open_output_tab3.click(open_output_folder, [], [])
     
     # Python-only editor loader for Dubbing segments table click.
     # Note: client-side seeking for transcription_df, translation_df, and dubbing_segments_df is handled globally in BLOCKS_JS.
