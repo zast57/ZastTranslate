@@ -286,6 +286,7 @@ MIT
   - **Transcription Clean Button**: Added a dedicated `🧹 Clean Fillers & Oral Tics` button in the Transcription editor to preview and apply instant subtitle polish before translation.
   - **Persistent Metadata Disk Storage**: Translated titles and descriptions are now automatically saved to disk (`output/metadata_translations.md` and `output/metadata_translations.json`) during Bulk and Single translations, and packaged inside the `bulk_export_all.zip` archive.
   - **Direct Explorer Folder Access**: Added `📂 Open Folder` buttons across all tabs (Transcription, Translation, Dubbing & Export, Bulk Mode) to instantly open the output directory in Windows Explorer without relying on browser download dialogs.
+  - **YouTube Metadata Localization Engine**: Calibrated metadata translation prompts to generate high-CTR catchy titles, strictly preserve affiliate URLs/links, emojis, and social handles, and localize conceptual hashtags into native target equivalents while safeguarding tech brand names and acronyms (`#ChatGPT`, `#LLM`, `#SEO`).
   - **Full-Page Vertical Scroll Fix**: Added robust `overflow-y: auto !important` styling to Gradio containers, preventing scroll lock when managing large video descriptions or expanded dataframes.
 - **Beta 1.06**
   - **Interactive Timeline Segment Editor**: Restructured main app layout into a two-column interface with a persistent preview column (video/audio players, interactive subtitle preview selectors, dynamic subtitle overlay) on the left, and action tabs on the right.
