@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 1.06
+# ZastTranslate — Beta 1.07
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ℹ️ **Beta 1.06**: Added an interactive timeline segment editor, seek-on-click row navigation, real-time client-side subtitle preview overlays, and single-line audio regeneration with cached timing controls. Tested on **Windows only**.
+> ℹ️ **Beta 1.07**: Added professional subtitle cleaning (oral filler removal & word-level timing sync), ergonomic line wrapping (max 40 chars/line), and clean multi-format export (.srt, .vtt, .sbv) for YouTube Studio. Tested on **Windows only**.
 
 Translate any video into 33 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -279,6 +279,11 @@ MIT
 
 ## History
 
+- **Beta 1.07**
+  - **Professional Subtitle Cleaning**: Added `modules/srt_cleaner.py` to automatically filter out conversational filler words and oral tics ("donc voilà", "alors en fait", "du coup", "euh", "so basically", "you know", etc.) while preserving strict millisecond-level word synchronization.
+  - **Ergonomic TV & YouTube Line Wrapping**: Subtitles are now automatically split and balanced into standard broadcast constraints (max 40 characters per line, 2 lines max per cue, 1.0s minimum readability duration).
+  - **Multi-Format Subtitle Export**: Direct export support for `.srt` (UTF-8 BOM), `.vtt`, and single-line `.sbv` (preventing YouTube Studio multi-line parser warnings).
+  - **Transcription Clean Button**: Added a dedicated `🧹 Clean Fillers & Oral Tics` button in the Transcription editor to preview and apply instant subtitle polish before translation.
 - **Beta 1.06**
   - **Interactive Timeline Segment Editor**: Restructured main app layout into a two-column interface with a persistent preview column (video/audio players, interactive subtitle preview selectors, dynamic subtitle overlay) on the left, and action tabs on the right.
   - **Click-to-Seek row navigation**: Clicking on any dialogue segment row in the Transcription, Translation, or Dubbing lists instantly jumps the video player playhead to the segment's starting time.

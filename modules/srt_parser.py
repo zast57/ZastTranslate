@@ -41,6 +41,21 @@ class SRTParser:
                 text = seg.get(text_key, "").strip()
                 f.write(f"{i}\n{start} --> {end}\n{text}\n\n")
 
+    def segments_to_clean_srt(self, segments, output_path, text_key="text", lang_code="fr", clean_fillers=True):
+        """
+        Write an ergonomically wrapped and optionally filler-cleaned SRT file.
+        """
+        from modules.srt_cleaner import SRTCleaner
+        cleaner = SRTCleaner()
+        
+        target_segs = segments
+        if clean_fillers:
+            target_segs = cleaner.clean_segments_heuristic(segments, lang_code=lang_code)
+            
+        cues = cleaner.split_into_ergonomic_cues(target_segs, text_key=text_key)
+        cleaner.export_srt(cues, output_path)
+        return cues
+
     def segments_to_bilingual_srt(self, segments, output_path, original_key="text", translated_key="translated_text"):
         """
         Generate a bilingual SRT (original + translation).

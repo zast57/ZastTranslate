@@ -525,6 +525,38 @@ def step2b_import_srt(srt_file, lang_source):
     except Exception as e:
         return f"Error importing SRT: {str(e)}", None, _get_empty_segments_html()
 
+def step2_clean_transcription(df_data, lang_source, progress=gr.Progress()):
+    """Clean oral fillers and polish transcription text in the editor."""
+    if not state.segments:
+        return "No transcription to clean.", df_data, _get_segments_json_html()
+    
+    progress(0.2, "Cleaning filler words & oral tics...")
+    from modules.srt_cleaner import SRTCleaner
+    cleaner = SRTCleaner()
+    
+    src_lang = state.video_info.get('detected_language', 'fr') if state.video_info else 'fr'
+    if lang_source != "Auto" and lang_source:
+        source_lang_map = {
+            "French": "fr", "English": "en", "Spanish": "es", "German": "de",
+            "Italian": "it", "Portuguese": "pt", "Japanese": "ja", "Korean": "ko",
+            "Chinese": "zh", "Russian": "ru", "Arabic": "ar", "Hindi": "hi",
+            "Dutch": "nl", "Polish": "pl", "Turkish": "tr", "Swedish": "sv",
+            "Czech": "cs", "Romanian": "ro", "Hungarian": "hu",
+        }
+        src_lang = source_lang_map.get(lang_source, src_lang)
+    
+    state.segments = cleaner.clean_segments_heuristic(state.segments, lang_code=src_lang)
+    
+    # Update df data
+    data = []
+    for seg in state.segments:
+        data.append([
+            round(seg['start'], 2), 
+            round(seg['end'], 2), 
+            seg['text']
+        ])
+    return f"Transcription cleaned ({len(data)} segments). Fillers removed and timings synced.", data, _get_segments_json_html()
+
 def _dataframe_to_rows(data):
     """Convert Gradio Dataframe output to list of lists, handling all formats."""
     import pandas as pd
@@ -704,33 +736,33 @@ def step5_save_translation(data, dubbing_text_source="Fitted Translation", trans
     )
 
 def export_transcription_srt():
-    """Export current transcription as SRT file with source language ISO code."""
+    """Export current transcription as clean & ergonomically wrapped SRT file with source language ISO code."""
     if not state.segments:
         return "No transcription to export.", None
-    src_lang = state.video_info.get('detected_language', '') if state.video_info else ''
+    src_lang = state.video_info.get('detected_language', 'fr') if state.video_info else 'fr'
     iso = _get_iso_code(src_lang)
     srt_path = os.path.join(TEMP_DIR, f"transcription_{iso}.srt")
-    srt_parser.segments_to_srt(state.segments, srt_path)
-    return f"Exported {len(state.segments)} segments.", srt_path
+    srt_parser.segments_to_clean_srt(state.segments, srt_path, text_key="text", lang_code=src_lang, clean_fillers=True)
+    return f"Exported {len(state.segments)} segments (clean & wrapped).", srt_path
 
 def export_translation_srt():
-    """Export normal/full translation as SRT file."""
+    """Export normal/full translation as clean & ergonomically wrapped SRT file."""
     if not state.translated_segments:
         return "No translation to export.", None
-    tgt_lang = state.video_info.get('target_language', '') if state.video_info else ''
+    tgt_lang = state.video_info.get('target_language', 'en') if state.video_info else 'en'
     iso = _get_iso_code(tgt_lang)
     srt_path = os.path.join(TEMP_DIR, f"translation_{iso}.srt")
-    srt_parser.segments_to_srt(state.translated_segments, srt_path, text_key="normal_text")
+    srt_parser.segments_to_clean_srt(state.translated_segments, srt_path, text_key="normal_text", lang_code=tgt_lang, clean_fillers=False)
     return f"Exported {len(state.translated_segments)} segments (full translation).", srt_path
 
 def export_fitted_srt():
-    """Export fitted/concise translation as SRT file (used for dubbing)."""
+    """Export fitted/concise translation as clean & ergonomically wrapped SRT file (used for dubbing)."""
     if not state.translated_segments:
         return "No translation to export.", None
-    tgt_lang = state.video_info.get('target_language', '') if state.video_info else ''
+    tgt_lang = state.video_info.get('target_language', 'en') if state.video_info else 'en'
     iso = _get_iso_code(tgt_lang)
     srt_path = os.path.join(TEMP_DIR, f"fitted_{iso}.srt")
-    srt_parser.segments_to_srt(state.translated_segments, srt_path, text_key="translated_text")
+    srt_parser.segments_to_clean_srt(state.translated_segments, srt_path, text_key="translated_text", lang_code=tgt_lang, clean_fillers=False)
     return f"Exported {len(state.translated_segments)} segments (fitted for dubbing).", srt_path
 
 def ensure_vocals_and_reference_audio():
@@ -1202,11 +1234,11 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         
         # Save SRTs
         trans_srt = os.path.join(TEMP_DIR, f"translation_{iso}.srt")
-        srt_parser.segments_to_srt(translated, trans_srt, text_key="normal_text")
+        srt_parser.segments_to_clean_srt(translated, trans_srt, text_key="normal_text", lang_code=target_lang_code, clean_fillers=False)
         output_files.append(trans_srt)
         
         fitted_srt = os.path.join(TEMP_DIR, f"fitted_{iso}.srt")
-        srt_parser.segments_to_srt(translated, fitted_srt, text_key="translated_text")
+        srt_parser.segments_to_clean_srt(translated, fitted_srt, text_key="translated_text", lang_code=target_lang_code, clean_fillers=False)
         output_files.append(fitted_srt)
         
         # Store SRT path for YouTube Publishing (We prefer natural translation for subtitles)
@@ -1590,7 +1622,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         with open(_logo_path, "rb") as _f:
             _logo_b64 = _b64.b64encode(_f.read()).decode()
         _logo_html = f"<center><img src='data:image/png;base64,{_logo_b64}' width='80' /></center>\n\n"
-    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.06\n**Offline video translation & dubbing (No Lip-Sync)**")
+    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.07\n**Offline video translation & dubbing (No Lip-Sync)**")
     
     with gr.Row():
         with gr.Column(scale=2, min_width=300):
@@ -1679,6 +1711,7 @@ with gr.Blocks(title="ZastTranslate") as app:
                 )
                 with gr.Row():
                     btn_valid_transcription = gr.Button("Validate Transcription ✅", variant="primary")
+                    btn_clean_transcription = gr.Button("🧹 Clean Fillers & Oral Tics", variant="secondary")
                     btn_export_transcription = gr.Button("Export SRT 💾", variant="secondary")
                 export_transcription_file = gr.File(label="Download SRT")
         
@@ -2090,6 +2123,7 @@ with gr.Blocks(title="ZastTranslate") as app:
     btn_import_srt.click(step2b_import_srt, [srt_file_input, lang_source], [transcription_status, transcription_df, segments_json_holder], show_progress="full", js=JS_SRT_WAIT)
     
     btn_valid_transcription.click(step3_save_transcription, [transcription_df], [transcription_status, btn_translate, btn_bulk_run, segments_json_holder])
+    btn_clean_transcription.click(step2_clean_transcription, [transcription_df, lang_source], [transcription_status, transcription_df, segments_json_holder], show_progress="full")
     btn_export_transcription.click(export_transcription_srt, [], [transcription_status, export_transcription_file])
     
     btn_import_metadata_single.click(import_metadata_from_state, [], [original_title_input, original_desc_input])
