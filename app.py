@@ -1218,6 +1218,18 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
                 'description': translated_desc
             }
             
+            # Save metadata to disk immediately so they are never lost on reload
+            meta_md_path = os.path.join(OUTPUT_DIR, "metadata_translations.md")
+            meta_json_path = os.path.join(OUTPUT_DIR, "metadata_translations.json")
+            try:
+                with open(meta_md_path, "w", encoding="utf-8") as _fmd:
+                    _fmd.write(metadata_display)
+                with open(meta_json_path, "w", encoding="utf-8") as _fjson:
+                    import json as _json
+                    _json.dump(state.bulk_results['localizations'], _fjson, ensure_ascii=False, indent=2)
+            except Exception as _meta_err:
+                print(f"Error saving metadata file: {_meta_err}")
+            
             yield f"[{idx+1}/{total_langs}] TRANSLATION PHASE: {target_lang}...", output_files, metadata_display
         
         progress(base_progress + prog_step * 0.2, f"[{target_lang}] Fitted translation...")
@@ -1344,6 +1356,10 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
     if not state.keep_models:
         tts_engine.cleanup()
     
+    meta_md_path = os.path.join(OUTPUT_DIR, "metadata_translations.md")
+    if os.path.exists(meta_md_path) and meta_md_path not in output_files:
+        output_files.append(meta_md_path)
+
     # Create a ZIP archive of all outputs for easy download
     import zipfile
     zip_path = os.path.join(OUTPUT_DIR, "bulk_export_all.zip")
