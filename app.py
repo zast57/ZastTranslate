@@ -1348,6 +1348,15 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
 
 
 
+def open_output_folder():
+    """Open the output folder in the OS file explorer."""
+    if os.path.exists(OUTPUT_DIR):
+        if os.name == 'nt':
+            os.startfile(OUTPUT_DIR)
+        else:
+            import subprocess
+            subprocess.Popen(['xdg-open' if sys.platform.startswith('linux') else 'open', OUTPUT_DIR])
+
 def step6_publish_youtube(progress=gr.Progress()):
     if not state.video_info or not state.video_info.get('youtube_id'):
         return "Error: No YouTube video ID found. Please import from a YouTube URL first."
@@ -1823,6 +1832,7 @@ with gr.Blocks(title="ZastTranslate") as app:
                 final_audio_out = gr.Audio(label="Mixed Audio")
                 with gr.Row():
                     btn_export_audio = gr.Button("Export Audio 🎵", variant="secondary")
+                    btn_open_output_tab4 = gr.Button("📂 Open Output Folder", variant="secondary")
                 export_audio_file = gr.File(label="Download Audio (WAV)")
         
             with gr.Tab("5. Bulk Mode") as tab5:
@@ -1873,6 +1883,8 @@ with gr.Blocks(title="ZastTranslate") as app:
                 btn_bulk_run = gr.Button("Run Bulk Process", interactive=False, variant="primary")
                 bulk_status_output = gr.Textbox(label="Status", interactive=False)
                 bulk_files_output = gr.File(label="Generated Files Output", file_count="multiple")
+                with gr.Row():
+                    btn_open_output = gr.Button("📂 Open Output Folder in Windows Explorer", variant="secondary")
                 bulk_metadata_output = gr.Markdown(label="Translated Metadata", height=600)
                 
                 with gr.Row():
@@ -2236,6 +2248,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         show_progress="full"
     )
     btn_export_audio.click(export_audio, [], [synth_status, export_audio_file])
+    btn_open_output_tab4.click(open_output_folder, [], [])
     
     btn_bulk_run.click(
         step5_bulk_run, 
@@ -2243,6 +2256,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         [bulk_status_output, bulk_files_output, bulk_metadata_output],
         show_progress="full"
     )
+    btn_open_output.click(open_output_folder, [], [])
     
     btn_youtube_publish.click(step6_publish_youtube, [], [bulk_publish_status], show_progress="full")
 
