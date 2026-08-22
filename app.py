@@ -89,6 +89,10 @@ def _get_empty_segments_html():
 def _build_dubbing_df_data(text_source):
     if not state.translated_segments:
         return []
+    target_lang = state.video_info.get('target_language', 'fr') if state.video_info else 'fr'
+    target_lang_code = LANGUAGES.get(target_lang, target_lang)
+    lang_tag = _get_iso_code(target_lang_code).lower()
+    
     rows = []
     for idx, seg in enumerate(state.translated_segments):
         text = seg.get("translated_text", "") # fitted
@@ -99,11 +103,11 @@ def _build_dubbing_df_data(text_source):
         end = seg.get("end", 0.0)
         
         status = "Not Generated"
-        audio_path = os.path.join(TEMP_DIR, f"seg_{start:.2f}_synced.wav")
+        audio_path = os.path.join(TEMP_DIR, f"seg_{lang_tag}_{start:.2f}_synced.wav")
         if os.path.exists(audio_path):
             status = "Ready"
         else:
-            audio_path = os.path.join(TEMP_DIR, f"nc_seg_{start:.2f}_synced.wav")
+            audio_path = os.path.join(TEMP_DIR, f"nc_seg_{lang_tag}_{start:.2f}_synced.wav")
             if os.path.exists(audio_path):
                 status = "Ready"
             
@@ -136,10 +140,14 @@ def load_segment_to_editor(evt: gr.SelectData, text_source, voice_mode, voice_fi
     end_min = int(seg["end"] // 60)
     end_sec = round(seg["end"] % 60, 2)
     
+    target_lang = state.video_info.get('target_language', 'fr') if state.video_info else 'fr'
+    target_lang_code = LANGUAGES.get(target_lang, target_lang)
+    lang_tag = _get_iso_code(target_lang_code).lower()
+    
     # Check if the audio file already exists in cache
-    audio_path = os.path.join(TEMP_DIR, f"seg_{seg['start']:.2f}_synced.wav")
+    audio_path = os.path.join(TEMP_DIR, f"seg_{lang_tag}_{seg['start']:.2f}_synced.wav")
     if never_cut:
-        audio_path = os.path.join(TEMP_DIR, f"nc_seg_{seg['start']:.2f}_synced.wav")
+        audio_path = os.path.join(TEMP_DIR, f"nc_seg_{lang_tag}_{seg['start']:.2f}_synced.wav")
         
     if not os.path.exists(audio_path):
         audio_path = None
@@ -1033,10 +1041,14 @@ def step6_regenerate_segment(
         state.segments[idx]["start"] = new_start
         state.segments[idx]["end"] = new_end
         
+    target_lang = state.video_info.get('target_language', 'fr') if state.video_info else 'fr'
+    target_lang_code = LANGUAGES.get(target_lang, target_lang)
+    lang_iso = _get_iso_code(target_lang_code).lower()
+    
     # Delete old cache files if timing changed
     if abs(old_start - new_start) > 0.01:
-        old_normal_cache = os.path.join(TEMP_DIR, f"seg_{old_start:.2f}_synced.wav")
-        old_nc_cache = os.path.join(TEMP_DIR, f"nc_seg_{old_start:.2f}_synced.wav")
+        old_normal_cache = os.path.join(TEMP_DIR, f"seg_{lang_iso}_{old_start:.2f}_synced.wav")
+        old_nc_cache = os.path.join(TEMP_DIR, f"nc_seg_{lang_iso}_{old_start:.2f}_synced.wav")
         for f in (old_normal_cache, old_nc_cache):
             if os.path.exists(f):
                 try:
@@ -1060,15 +1072,11 @@ def step6_regenerate_segment(
     print(f"[REGEN] row_idx={row_idx_1based}, voice_mode='{voice_mode}', voice_path='{voice_path}'")
     tts_engine.load(ref_audio_path=voice_path)
     
-    target_lang = state.video_info.get('target_language', 'fr') if state.video_info else 'fr'
-    target_lang_code = LANGUAGES.get(target_lang, target_lang)
-    lang_iso = _get_iso_code(target_lang_code).lower()
-    
     try:
         time_sync._compute_effective_durations(state.translated_segments, total_duration=state.video_info.get('duration'))
         
         # Override temporary file name check to bypass cache for this specific regeneration
-        temp_cache_file = os.path.join(TEMP_DIR, f"seg_{new_start:.2f}_synced.wav")
+        temp_cache_file = os.path.join(TEMP_DIR, f"seg_{lang_iso}_{new_start:.2f}_synced.wav")
         if os.path.exists(temp_cache_file):
             try:
                 os.remove(temp_cache_file)
@@ -1082,7 +1090,7 @@ def step6_regenerate_segment(
             raise FileNotFoundError("Synthesized audio file not found.")
             
         if never_cut:
-            nc_synced_path = os.path.join(TEMP_DIR, f"nc_seg_{new_start:.2f}_synced.wav")
+            nc_synced_path = os.path.join(TEMP_DIR, f"nc_seg_{lang_iso}_{new_start:.2f}_synced.wav")
             shutil.copy2(seg_audio_path, nc_synced_path)
             seg_audio_path = nc_synced_path
             
@@ -1171,6 +1179,14 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
     # Detect source language from transcription
     source_lang = state.video_info.get('detected_language', 'en') if state.video_info else 'en'
     
+    # Clear old synced segment audio cache when running a bulk process
+    import glob
+    for f in glob.glob(os.path.join(TEMP_DIR, "seg_*.wav")) + glob.glob(os.path.join(TEMP_DIR, "nc_seg_*.wav")):
+        try:
+            os.remove(f)
+        except Exception:
+            pass
+
     # Ensure vocals and background audio are prepared and present on disk
     if state.video_info:
         yield "Ensuring background and vocals are prepared...", output_files, metadata_display

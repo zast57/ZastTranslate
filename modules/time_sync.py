@@ -144,10 +144,11 @@ class TimeSync:
         text = segment.get("translated_text", segment.get("text", ""))
         effective_duration = segment.get("effective_duration", strict_duration)
         
-        # Cache reuse check
-        final_synced_path = os.path.join(TEMP_DIR, f"seg_{segment['start']:.2f}_synced.wav")
+        # Cache reuse check per language
+        lang_tag = str(language).lower().strip()[:3] if language else "all"
+        final_synced_path = os.path.join(TEMP_DIR, f"seg_{lang_tag}_{segment['start']:.2f}_synced.wav")
         if os.path.exists(final_synced_path):
-            print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}]: Reusing cached audio {final_synced_path}")
+            print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}] ({lang_tag}): Reusing cached audio {final_synced_path}")
             try:
                 info = sf.info(final_synced_path)
                 actual_duration = info.duration
@@ -170,7 +171,7 @@ class TimeSync:
         
         # Check if backend supports duration control natively
         has_duration_control = self.tts.capabilities.get("duration_control", False)
-        temp_tts_path = os.path.join(TEMP_DIR, f"seg_{segment['start']:.2f}_temp.wav")
+        temp_tts_path = os.path.join(TEMP_DIR, f"seg_{lang_tag}_{segment['start']:.2f}_temp.wav")
         
         if has_duration_control and effective_duration > MIN_SEGMENT_DURATION:
             # PASS 1: Generate EXACTLY at the target duration
@@ -179,7 +180,7 @@ class TimeSync:
                 ref_audio_path=voice_path, duration=effective_duration, gender=gender
             )
             current_duration = res["duration"]
-            print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}]: Backend native duration control used ({current_duration:.2f}s)")
+            print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}] ({lang_tag}): Backend native duration control used ({current_duration:.2f}s)")
         else:
             # PASS 1: Generate TTS at natural speed (pass duration as hint for max_new_tokens capping)
             res = self.tts.generate(
@@ -200,7 +201,7 @@ class TimeSync:
                     # This works for any TTS backend regardless of speaking rate
                     scale = (effective_duration / current_duration) * 0.90
                     target_chars = max(10, int(len(current_text) * scale))
-                    print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}]: {overflow:.2f}s over → LLM reformulation {attempt+1}/3 (≤{target_chars} chars)")
+                    print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}] ({lang_tag}): {overflow:.2f}s over → LLM reformulation {attempt+1}/3 (≤{target_chars} chars)")
                     try:
                         shorter_text = self.reformulator.shorten(current_text, target_chars, language)
                     except Exception as e:
@@ -209,7 +210,7 @@ class TimeSync:
                     if not shorter_text or len(shorter_text) >= len(current_text):
                         print(f"  Reformulation returned same/longer text, stopping")
                         break
-                    temp_regen_path = os.path.join(TEMP_DIR, f"seg_{segment['start']:.2f}_regen{attempt}.wav")
+                    temp_regen_path = os.path.join(TEMP_DIR, f"seg_{lang_tag}_{segment['start']:.2f}_regen{attempt}.wav")
                     res_regen = self.tts.generate(
                         text=shorter_text, language=language, output_path=temp_regen_path,
                         ref_audio_path=voice_path, duration=effective_duration, gender=gender
@@ -231,7 +232,7 @@ class TimeSync:
                     print(f"  [{segment['start']:.1f}-{segment['end']:.1f}] Still {overflow:.2f}s over after reformulation — accepting (crossfade will handle)")
             elif current_duration > strict_duration + TOLERANCE_TOO_LONG:
                 gap_used = current_duration - strict_duration
-                print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}]: using {gap_used:.2f}s from gap")
+                print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}] ({lang_tag}): using {gap_used:.2f}s from gap")
 
         # Update segment text directly if it was reformulated
         if final_text != text:
@@ -242,7 +243,7 @@ class TimeSync:
                 segment["normal_text"] = final_text
 
         # READ, RESAMPLE, SAVE (no truncation — SPEC §N.2 forbids modifying audio)
-        final_synced_path = os.path.join(TEMP_DIR, f"seg_{segment['start']:.2f}_synced.wav")
+        final_synced_path = os.path.join(TEMP_DIR, f"seg_{lang_tag}_{segment['start']:.2f}_synced.wav")
         
         audio, sr = sf.read(temp_tts_path)
         audio, sr = self._resample_to_target(audio, sr)
@@ -369,8 +370,9 @@ class TimeSync:
                 })
                 continue
 
-            # Check if synced/cached never-cut audio already exists
-            synced_path = os.path.join(TEMP_DIR, f"nc_seg_{seg['start']:.2f}_synced.wav")
+            # Check if synced/cached never-cut audio already exists per language
+            lang_tag = str(language).lower().strip()[:3] if language else "all"
+            synced_path = os.path.join(TEMP_DIR, f"nc_seg_{lang_tag}_{seg['start']:.2f}_synced.wav")
             if os.path.exists(synced_path):
                 try:
                     info = sf.info(synced_path)
@@ -379,7 +381,7 @@ class TimeSync:
                         "tts_path": synced_path,
                         "tts_duration": info.duration
                     })
-                    print(f"[NeverCut] Seg [{seg['start']:.1f}-{seg['end']:.1f}]: Reusing cached synced audio ({info.duration:.2f}s)")
+                    print(f"[NeverCut] Seg [{seg['start']:.1f}-{seg['end']:.1f}] ({lang_tag}): Reusing cached synced audio ({info.duration:.2f}s)")
                     continue
                 except Exception as e:
                     print(f"Failed to read cached never-cut audio info: {e}. Re-generating...")
@@ -389,7 +391,7 @@ class TimeSync:
                 spk = seg.get("speaker", "SPEAKER_00")
                 voice = voice_mapping.get(spk)
 
-            tts_path = os.path.join(TEMP_DIR, f"nc_seg_{seg['start']:.2f}.wav")
+            tts_path = os.path.join(TEMP_DIR, f"nc_seg_{lang_tag}_{seg['start']:.2f}.wav")
             res = self.tts.generate(
                 text=text, language=language, output_path=tts_path, ref_audio_path=voice, speed=1.0,
                 duration=strict_duration, gender=gender
@@ -540,9 +542,10 @@ class TimeSync:
 
         # Phase 3: Build synced_segments list (same format as sync_all output)
         synced_segments = []
+        lang_tag = str(language).lower().strip()[:3] if language else "all"
         for seg in placed:
             tts_path = seg.get("tts_path")
-            synced_path = os.path.join(TEMP_DIR, f"nc_seg_{seg['start']:.2f}_synced.wav")
+            synced_path = os.path.join(TEMP_DIR, f"nc_seg_{lang_tag}_{seg['start']:.2f}_synced.wav")
 
             if tts_path == synced_path and os.path.exists(synced_path):
                 # Already resampled and cached
