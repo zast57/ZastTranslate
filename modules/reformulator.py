@@ -482,12 +482,15 @@ Shortened ({target_chars} chars max):"""
             {
                 "role": "system",
                 "content": (
-                    f"You are a professional translator. Translate the user's input text from {source_lang} to {target_lang}.\n"
+                    f"You are an expert native translator and localization specialist for YouTube content. "
+                    f"Translate the user's text from {source_lang} to {target_lang}.\n"
                     f"CRITICAL RULES:\n"
                     f"- Output ONLY the translated text, nothing else.\n"
-                    f"- DO NOT output your internal reasoning, and DO NOT output 'Thinking Process:'.\n"
-                    f"- DO NOT include any introduction, explanations, notes, or quotes.\n"
-                    f"- Translate the text exactly as provided by the user, preserving all formatting and paragraphs."
+                    f"- DO NOT output your internal reasoning, thinking process, notes, quotes, or preambles.\n"
+                    f"- Keep the tone engaging, natural, and idiomatic for YouTube titles and descriptions.\n"
+                    f"- PRESERVE EXACTLY all URLs, links, social media handles, emojis, and paragraph formatting.\n"
+                    f"- Translate relevant hashtags naturally into {target_lang} (e.g. #PromptInjection, #Cybersecurity) while keeping brand names and standard acronyms intact (#ChatGPT, #LLM, #SEO).\n"
+                    f"- Do not alter or translate website URLs, affiliate links, or channel handles."
                 )
             },
             {"role": "user", "content": text}
