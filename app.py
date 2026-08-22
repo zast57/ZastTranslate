@@ -1410,7 +1410,20 @@ def get_valid_languages(tts_backend_name, llm_backend_name):
 INITIAL_VALID_LANGS = get_valid_languages(current_tts_backend, current_llm_backend)
 INITIAL_LANG_VALUE = INITIAL_VALID_LANGS[0] if INITIAL_VALID_LANGS else None
 
-BLOCKS_CSS = "#segments_json_holder { display: none !important; }"
+BLOCKS_CSS = """
+#segments_json_holder { display: none !important; }
+html, body {
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100vh !important;
+}
+.gradio-container {
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    max-width: 98% !important;
+}
+"""
 BLOCKS_JS = """
 (() => {
     const debugLog = (msg) => {
