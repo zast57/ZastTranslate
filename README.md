@@ -284,6 +284,9 @@ MIT
   - **Ergonomic TV & YouTube Line Wrapping**: Subtitles are now automatically split and balanced into standard broadcast constraints (max 40 characters per line, 2 lines max per cue, 1.0s minimum readability duration).
   - **Multi-Format Subtitle Export**: Direct export support for `.srt` (UTF-8 BOM), `.vtt`, and single-line `.sbv` (preventing YouTube Studio multi-line parser warnings).
   - **Transcription Clean Button**: Added a dedicated `🧹 Clean Fillers & Oral Tics` button in the Transcription editor to preview and apply instant subtitle polish before translation.
+  - **Persistent Metadata Disk Storage**: Translated titles and descriptions are now automatically saved to disk (`output/metadata_translations.md` and `output/metadata_translations.json`) during Bulk and Single translations, and packaged inside the `bulk_export_all.zip` archive.
+  - **Direct Explorer Folder Access**: Added `📂 Open Folder` buttons across all tabs (Transcription, Translation, Dubbing & Export, Bulk Mode) to instantly open the output directory in Windows Explorer without relying on browser download dialogs.
+  - **Full-Page Vertical Scroll Fix**: Added robust `overflow-y: auto !important` styling to Gradio containers, preventing scroll lock when managing large video descriptions or expanded dataframes.
 - **Beta 1.06**
   - **Interactive Timeline Segment Editor**: Restructured main app layout into a two-column interface with a persistent preview column (video/audio players, interactive subtitle preview selectors, dynamic subtitle overlay) on the left, and action tabs on the right.
   - **Click-to-Seek row navigation**: Clicking on any dialogue segment row in the Transcription, Translation, or Dubbing lists instantly jumps the video player playhead to the segment's starting time.
