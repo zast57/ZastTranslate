@@ -138,24 +138,36 @@ def split_long_segments(segments, max_duration=8.0, max_chars=75):
         new_segments.extend(split_segment(seg, max_duration, max_chars))
     return new_segments
 
+DEFAULT_INITIAL_PROMPT = (
+    "Claude, Claude AI, Claude.ai, Anthropic, ChatGPT, OpenAI, GPT-4, "
+    "Midjourney, Pinokio, Whisper, WhisperX, Stable Diffusion, ComfyUI, "
+    "Hugging Face, Python, GitHub, YouTube, Gradio, LLM, IA, API, ZastTranslate."
+)
+
 class Transcriber:
     def __init__(self, model_size="large-v3", compute_type="float16"):
         self.model_size = model_size
         self.compute_type = compute_type if DEVICE == "cuda" else "int8"
         self.device = DEVICE
 
-    def transcribe(self, audio_path, language=None, enable_diarization=True):
+    def transcribe(self, audio_path, language=None, enable_diarization=True, initial_prompt=None):
         """
         Transcribe audio with WhisperX.
         Returns {"language": str, "segments": list}
         """
-        print(f"Loading WhisperX {self.model_size} on {self.device}...")
+        prompt = initial_prompt or DEFAULT_INITIAL_PROMPT
+        print(f"Loading WhisperX {self.model_size} on {self.device} with initial_prompt context...")
+        asr_options = {
+            "initial_prompt": prompt,
+            "condition_on_previous_text": False,
+        }
         try:
             model = whisperx.load_model(
                 self.model_size, 
                 self.device, 
                 compute_type=self.compute_type,
-                language=language
+                language=language,
+                asr_options=asr_options
             )
         except Exception as e:
             print(f"Model loading error: {e}")
@@ -194,6 +206,16 @@ class Transcriber:
         
         split_segs = split_long_segments(result["segments"], max_duration=8.0, max_chars=75)
         print(f"Split long segments: {len(result['segments'])} -> {len(split_segs)}")
+        
+        # Apply tech/AI brand phonetic normalization to all segments
+        from modules.srt_cleaner import TECH_BRAND_REPLACEMENTS
+        import re
+        for seg in split_segs:
+            text = seg.get("text", "")
+            for pat, rep in TECH_BRAND_REPLACEMENTS:
+                text = re.sub(pat, rep, text, flags=re.IGNORECASE)
+            seg["text"] = text.strip()
+            
         return {
             "language": detected_lang,
             "segments": split_segs

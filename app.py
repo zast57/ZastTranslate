@@ -396,10 +396,15 @@ def step2_transcribe(lang_source, model_size, progress=gr.Progress()):
     }
     lang_code = source_lang_map.get(lang_source)
     
+    video_title = state.video_info.get('title', '')
+    from modules.transcriber import DEFAULT_INITIAL_PROMPT
+    custom_prompt = f"{video_title}. {DEFAULT_INITIAL_PROMPT}" if video_title else DEFAULT_INITIAL_PROMPT
+
     res = transcriber.transcribe(
         state.video_info['audio_16k'], 
         language=lang_code,
-        enable_diarization=False
+        enable_diarization=False,
+        initial_prompt=custom_prompt
     )
     state.segments = res['segments']
     state.video_info['detected_language'] = res['language']
@@ -1688,7 +1693,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         with open(_logo_path, "rb") as _f:
             _logo_b64 = _b64.b64encode(_f.read()).decode()
         _logo_html = f"<center><img src='data:image/png;base64,{_logo_b64}' width='80' /></center>\n\n"
-    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.07\n**Offline video translation & dubbing (No Lip-Sync)**")
+    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.08\n**Offline video translation & dubbing (No Lip-Sync)**")
     
     with gr.Row():
         with gr.Column(scale=2, min_width=300):

@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 1.07
+# ZastTranslate — Beta 1.08
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ℹ️ **Beta 1.07**: Added professional subtitle cleaning (oral filler removal & word-level timing sync), ergonomic line wrapping (max 40 chars/line), and clean multi-format export (.srt, .vtt, .sbv) for YouTube Studio. Tested on **Windows only**.
+> ℹ️ **Beta 1.08**: Upgraded PyTorch backend to CUDA 12.8 (`cu128`) with native support for NVIDIA GeForce RTX 50-series GPUs (RTX 5070, 5070 Ti, 5080, 5090 Blackwell architecture / `sm_120`) and hardened Demucs execution. Tested on **Windows only**.
 
 Translate any video into 33 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -279,6 +279,11 @@ MIT
 
 ## History
 
+- **Beta 1.08**
+  - **NVIDIA RTX 50-Series Support (Blackwell / `sm_120`)**: Upgraded PyTorch backend to CUDA 12.8 (`cu128`), introducing full native support for NVIDIA GeForce RTX 5070, RTX 5070 Ti, RTX 5080, and RTX 5090 GPUs (compute capability `sm_120`), resolving `CUDA capability sm_120 is not compatible` errors during Demucs audio separation and model inference.
+  - **WhisperX AI & Tech Context Priming (`initial_prompt`)**: Injected a comprehensive AI/tech domain context prompt (`Claude.ai`, `ChatGPT`, `Anthropic`, `Pinokio`, `Midjourney`, etc.) combined with imported video titles into WhisperX's autoregressive decoder. This eliminates phonetic acoustic hallucinations (such as transcribing "Claude.ai" as "CloudEye").
+  - **Tech Brand & Phonetic Normalizer**: Added automatic phonetic brand repair in `modules/srt_cleaner.py` and `modules/transcriber.py` to seamlessly normalize AI/tech company names and preserved domain formatting (`.ai`, `.com`).
+  - **Hardened Subprocess Environment Routing**: Switched Demucs execution in `modules/separator.py` to use `sys.executable -m demucs`, ensuring reliable execution under all Windows virtual environment configurations.
 - **Beta 1.07**
   - **Professional Subtitle Cleaning**: Added `modules/srt_cleaner.py` to automatically filter out conversational filler words and oral tics ("donc voilà", "alors en fait", "du coup", "euh", "so basically", "you know", etc.) while preserving strict millisecond-level word synchronization.
   - **Ergonomic TV & YouTube Line Wrapping**: Subtitles are now automatically split and balanced into standard broadcast constraints (max 40 characters per line, 2 lines max per cue, 1.0s minimum readability duration).

@@ -49,6 +49,19 @@ MID_HESITATION_PATTERNS = {
     "pt": (r'[,;\s]*\b(?:é|ahn)\b[,;\s]*', r'[,;\s]+\b(?:né|sabe)\s*$'),
 }
 
+TECH_BRAND_REPLACEMENTS = [
+    (r'\b(?:CloudEye|Cloud\s*Eye|Cloud\s*A\s*I|Cloude\s*AI|Cloud\s*ai)\b', 'Claude.ai'),
+    (r'\bClaude\s*dot\s*ai\b', 'Claude.ai'),
+    (r'\bChat\s+GPT\b', 'ChatGPT'),
+    (r'\bOpen\s+AI\b', 'OpenAI'),
+    (r'\bMid\s+journey\b', 'Midjourney'),
+    (r'\bStable\s+Diffusion\b', 'Stable Diffusion'),
+    (r'\bComfy\s*UI\b', 'ComfyUI'),
+    (r'\bPinokio\b', 'Pinokio'),
+    (r'\bWhisper\s*X\b', 'WhisperX'),
+    (r'\bHugging\s*Face\b', 'Hugging Face'),
+]
+
 class SRTCleaner:
     """
     Professional Subtitle Cleaner & Ergonomic Formatter.
@@ -72,7 +85,7 @@ class SRTCleaner:
         return lang_code.lower()[:2]
 
     def clean_text_heuristics(self, text: str, lang_code: str = "en") -> str:
-        """Clean oral fillers and normalize spacing/punctuation using fast regex."""
+        """Clean oral fillers, fix tech brand phonetics, and normalize spacing/punctuation."""
         if not text:
             return ""
         
@@ -91,9 +104,15 @@ class SRTCleaner:
             cleaned = re.sub(mid_pat, ' ', cleaned, flags=re.IGNORECASE)
             cleaned = re.sub(end_pat, '', cleaned, flags=re.IGNORECASE)
 
-        # Fix spacing around punctuation
+        # Fix spacing around punctuation (avoid breaking domain names like .ai, .com)
         cleaned = re.sub(r'\s+([,;.!?])', r'\1', cleaned)
-        cleaned = re.sub(r'([,;.!?])(?=[^\s\d])', r'\1 ', cleaned)
+        cleaned = re.sub(r'([,;!?])(?=[^\s\d])', r'\1 ', cleaned)
+        cleaned = re.sub(r'\.(?=[A-ZÀ-ÖØ-ß])', '. ', cleaned)
+
+        # Apply tech / AI brand phonetic normalizations
+        for pat, rep in TECH_BRAND_REPLACEMENTS:
+            cleaned = re.sub(pat, rep, cleaned, flags=re.IGNORECASE)
+
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
         
         # Capitalize first letter

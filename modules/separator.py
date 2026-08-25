@@ -1,3 +1,4 @@
+import sys
 import torch
 import os
 import subprocess
@@ -18,7 +19,7 @@ class VocalSeparator:
         
         # Demucs command with --two-stems to get vocals.wav + no_vocals.wav
         cmd = [
-            "demucs",
+            sys.executable, "-m", "demucs",
             "-n", self.model_name,
             "--out", TEMP_DIR,
             "--device", DEVICE,

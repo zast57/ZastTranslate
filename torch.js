@@ -15,7 +15,7 @@ module.exports = {
                 },
                 "message": [
                     "uv pip install typing-extensions>=4.10.0",
-                    "uv pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126 --force-reinstall --no-deps"
+                    "uv pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu128 --force-reinstall --no-deps"
                 ]
             },
             "next": null
@@ -35,7 +35,7 @@ module.exports = {
                 },
                 "message": [
                     "uv pip install typing-extensions>=4.10.0",
-                    "uv pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126 --force-reinstall --no-deps"
+                    "uv pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu128 --force-reinstall --no-deps"
                 ]
             },
             "next": null
