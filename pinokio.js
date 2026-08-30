@@ -1,7 +1,7 @@
 module.exports = {
   version: "5.0",
-  title: "ZastTranslate — Beta 1.08",
-  description: "Video translation & dubbing with voice cloning — 100% local, zero API. Supports 30 languages (VoxCPM 2) with per-language CPS calibration, automatic transcription, translation, and AI dubbing.",
+  title: "ZastTranslate — Beta 1.10",
+  description: "Video translation & dubbing with voice cloning — 100% local, zero API. Supports 30 languages (VoxCPM 2) with per-language CPS calibration, automatic transcription, YouTube SEO Studio, translation, and AI dubbing.",
   icon: "zastttranslate.png",
   menu: async (kernel, info) => {
     let installed = info.exists("env/installed.sentinel")

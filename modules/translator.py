@@ -112,7 +112,7 @@ class Translator:
                 seg["translated_text"] = constrained_text
                 seg["retranslated"] = True
                 retranslated += 1
-                print(f"  Constrained [{seg['start']:.1f}-{seg['end']:.1f}]: {old_len}→{len(constrained_text)} chars")
+                print(f"  Constrained [{seg['start']:.1f}-{seg['end']:.1f}]: {old_len}->{len(constrained_text)} chars")
         
         return segments, retranslated
 

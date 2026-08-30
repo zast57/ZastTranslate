@@ -153,12 +153,12 @@ class Reformulator:
         prompt = f"""You are an expert video dubbing translator. Translate from {src_name} to {tgt_name}.
 
 Source text: "{text}"
-Strict target duration: {duration:.1f}s → translation MAX {max_chars} characters (spaces included).
+Strict target duration: {duration:.1f}s -> translation MAX {max_chars} characters (spaces included).
 ABSOLUTE RULES:
-- Keep the main meaning and tone.
+- Keep the core meaning, intent, and tone.
+- Natural spoken phrasing: if the source contains verbal hesitations, false starts, or self-corrections, translate the intended meaning cleanly and smoothly.
 - Be BRUTALLY concise: remove ALL fillers, unnecessary words, secondary details, repetitions.
-- Paraphrase short, use contractions, fast spoken language, abbreviations if natural.
-- Priority: fit within the duration, even if it requires simplification.
+- Priority: fit strictly within {max_chars} characters while sounding 100% natural and idiomatic.
 - Output ONLY the {tgt_name} translation, nothing else.
 
 {tgt_name}:"""
@@ -188,12 +188,12 @@ ABSOLUTE RULES:
             prompt = f"""You are an expert video dubbing translator. Translate from {src_name} to {tgt_name}.
 
 Source text: "{text}"
-Strict target duration: {duration:.1f}s → translation MAX {max_chars} characters (spaces included).
+Strict target duration: {duration:.1f}s -> translation MAX {max_chars} characters (spaces included).
 ABSOLUTE RULES:
-- Keep the main meaning and tone.
+- Keep the core meaning, intent, and tone.
+- Natural spoken phrasing: if the source contains verbal hesitations, false starts, or self-corrections, translate the intended meaning cleanly and smoothly.
 - Be BRUTALLY concise: remove ALL fillers, unnecessary words, secondary details, repetitions.
-- Paraphrase short, use contractions, fast spoken language, abbreviations if natural.
-- Priority: fit within the duration, even if it requires simplification.
+- Priority: fit strictly within {max_chars} characters while sounding 100% natural and idiomatic.
 - Output ONLY the {tgt_name} translation, nothing else.
 
 {tgt_name}:"""
@@ -248,7 +248,7 @@ ABSOLUTE RULES:
         same_lang = (src_name == tgt_name)
         
         BATCH_SIZE = 8
-        print(f"LLM Translation → {tgt_name} ({len(segments)} segments, batch={BATCH_SIZE}, CPS={cps})...")
+        print(f"LLM Translation -> {tgt_name} ({len(segments)} segments, batch={BATCH_SIZE}, CPS={cps})...")
 
         aggressive_cps = cps
 
@@ -326,15 +326,16 @@ ABSOLUTE RULES:
 
     def _build_normal_messages(self, text, src_name, tgt_name):
         """Build messages + max_new_tokens for a translate_normal call (used for batching)."""
-        prompt = f"""Translate the following text from {src_name} to {tgt_name}.
-Translate naturally and faithfully, preserving the full meaning, tone, and nuance.
-Do NOT shorten or simplify. Output ONLY the {tgt_name} translation.
+        prompt = f"""Translate the following spoken text from {src_name} to {tgt_name}.
+Translate naturally, fluently, and faithfully into modern, idiomatic {tgt_name}.
+If the speaker hesitated or self-corrected mid-sentence, smooth it into a natural, clean sentence conveying the intended thought.
+Do NOT output robotic word-for-word translations of spoken slips. Output ONLY the {tgt_name} translation.
 
 Source: "{text}"
 
 {tgt_name}:"""
         messages = [
-            {"role": "system", "content": f"You are a professional translator. Translate from {src_name} to {tgt_name} naturally and faithfully. Output ONLY the translation."},
+            {"role": "system", "content": f"You are a professional translator. Translate from {src_name} to {tgt_name} naturally and idiomatically. Output ONLY the translation."},
             {"role": "user", "content": prompt}
         ]
         return messages, max(30, int(len(text) * 2))
@@ -352,7 +353,7 @@ Source: "{text}"
         tgt_name = self._language_name(target_lang_code)
         same_lang = (src_name == tgt_name)
         BATCH_SIZE = 8
-        print(f"Normal Translation → {tgt_name} ({len(segments)} segments, batch={BATCH_SIZE}, natural/full)...")
+        print(f"Normal Translation -> {tgt_name} ({len(segments)} segments, batch={BATCH_SIZE}, natural/full)...")
         
         for batch_start in range(0, len(segments), BATCH_SIZE):
             batch = segments[batch_start:batch_start + BATCH_SIZE]
@@ -487,9 +488,11 @@ Shortened ({target_chars} chars max):"""
                     f"CRITICAL RULES:\n"
                     f"- Output ONLY the translated text, nothing else.\n"
                     f"- DO NOT output your internal reasoning, thinking process, notes, quotes, or preambles.\n"
-                    f"- Keep the tone engaging, natural, and idiomatic for YouTube titles and descriptions.\n"
-                    f"- PRESERVE EXACTLY all URLs, links, social media handles, emojis, and paragraph formatting.\n"
-                    f"- Translate relevant hashtags naturally into {target_lang} (e.g. #PromptInjection, #Cybersecurity) while keeping brand names and standard acronyms intact (#ChatGPT, #LLM, #SEO).\n"
+                    f"- DO NOT use markdown bold asterisks (**) anywhere in the output.\n"
+                    f"- Use natural {target_lang} sentence casing (do NOT capitalize every single word).\n"
+                    f"- Keep the tone engaging, natural, and idiomatic for YouTube titles, chapters, and descriptions.\n"
+                    f"- PRESERVE EXACTLY all URLs, links, social media handles, emojis, and line break formatting.\n"
+                    f"- Translate relevant hashtags naturally into {target_lang} while keeping brand names intact (#DragonBall, #Nikolatoy, #Goku, #Kamehameha).\n"
                     f"- Do not alter or translate website URLs, affiliate links, or channel handles."
                 )
             },
@@ -497,6 +500,10 @@ Shortened ({target_chars} chars max):"""
         ]
         
         result = self._generate(messages, max_new_tokens=4096, multiline=True)
+        if result:
+            # Strip any markdown bold asterisks
+            result = re.sub(r"\*\*([^*]+)\*\*", r"\1", result)
+            result = re.sub(r"\*([^*]+)\*", r"\1", result).strip()
         return result if result else ""
 
     def cleanup(self):

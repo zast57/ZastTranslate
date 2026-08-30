@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 1.08
+# ZastTranslate — Beta 1.10
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ℹ️ **Beta 1.08**: Upgraded PyTorch backend to CUDA 12.8 (`cu128`) with native support for NVIDIA GeForce RTX 50-series GPUs (RTX 5070, 5070 Ti, 5080, 5090 Blackwell architecture / `sm_120`) and hardened Demucs execution. Tested on **Windows only**.
+> ℹ️ **Beta 1.10**: Added interactive **YouTube SEO & Metadata Studio** with visible 4 hashtag packs, automatic YouTube Chapters generation from Wav2Vec2 subtitle timestamps, live YouTube search autocomplete trends discovery with tech disambiguation (0 API key), and seamless downstream translation pipeline. Tested on **Windows only**.
 
 Translate any video into 33 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -83,6 +83,25 @@ After transcription, review and edit the table (Start, End, Text).
 
 You can also **import an existing SRT file** instead of running transcription.
 
+#### 🚀 YouTube SEO & Description Studio (Chapters, Hashtags & Tags)
+
+Under the transcription table, the built-in **YouTube SEO & Description Studio** generates high-ranking, publication-ready metadata calibrated to top YouTube ranking criteria (vidIQ / TubeBuddy 100/100 guidelines):
+
+- **📌 Front-Loaded High-CTR Titles**: Focuses on the primary search intent and exact product/tool name within the first words with natural sentence casing and brand normalizations (*Hermès Agent*, *Windows*, *IA*, *API*, *ChatGPT*).
+- **⏱️ Full-Duration Timeline Chapters & Landmark Detection**: Uniformly analyzes the entire video from `00:00` to the very last second. Automatically detects major technical landmarks (*Ollama*, *Qwen Local LLM*, *Telegram Bots*, *Smartphone Remote Control*, *API Setup*, *Automated Jobs*) and generates clean, well-spaced timestamped chapters (1 to 3 minutes between milestones).
+- **📝 High-Retention Clean Descriptions (300+ words)**: Formatted strictly with zero markdown asterisks (`**`) so you can copy and paste directly into YouTube Studio without broken formatting. Includes an engaging search-focused hook (under 150 chars), rich feature breakdown, chapters list, link references, and call to action.
+- **🏷️ 4 Strategic Hashtag Packs (Live UI Visibility & 1-Click Switching)**:
+  1. `Pack 1 (Subject & Tool)`: Targets direct brand and tool searches (`#HermesAgent #IA #IntelligenceArtificielle #OpenSource #Windows`).
+  2. `Pack 2 (Format & Tutorial)`: Targets learners and intent queries (`#HermesAgent #Tutoriel #GuideComplet #Installation #Avis #Test`).
+  3. `Pack 3 (Tech Stack & Ecosystem)`: Targets local developers and technical communities (`#HermesAgent #Ollama #Qwen #LocalLLM #Telegram #Automation`).
+  4. `Pack 4 (Trends & Suggested Videos)`: Piggybacks on YouTube's algorithmic homepage recommendations (`#HermesAgent #Innovation #Dev #Tendance #AIAgent #ChatGPT`).
+- **🔍 Live YouTube Autocomplete Search Suggestion Mining**:
+  - Automatically queries Google's public YouTube search suggestion endpoint (`https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=...`) in real-time (0 API key required).
+  - Retrieves the **exact search terms real users are typing right now** on YouTube, sorted by popularity and search volume.
+  - Applies **smart semantic disambiguation** and a domain blacklist to purge unrelated fashion or clothing homonyms for tech subjects.
+- **🎯 Long-Tail Tags Pool**: Combines live YouTube suggestions with high-CTR modifier patterns (`tuto ...`, `installation ... windows`, `test ...`, `avis ...`) formatted ready for YouTube Studio's tag box.
+- **📥 One-Click Metadata Sync**: Click **"Apply to Translation & Bulk Metadata"** to immediately forward the generated title and description to Tab 3 (Single Translation) and Tab 5 (Bulk Mode) for multi-language localization.
+
 ### Step 3 — Translation
 
 Select the target language and click **Run Translation**. The app generates two versions:
@@ -158,12 +177,13 @@ Automate the translation and dubbing process for multiple languages down to a si
 2. Select all the target languages you want from the dropdown list.
 3. *(Optional)* Fill in the **Original Video Title** and **Description**. The AI will translate them into every selected language and display them on-screen for easy copy-pasting.
 4. Choose your voice options (whether to clone or not, etc.).
-5. Choose your output: 
-   - **Video + Audio**: Generates the final MP4 dubbed videos and the WAV audio tracks.
-   - **Audio Only**: Generates only the WAV mixed audio tracks and SRTs (faster if you don't need videos).
+5. Choose your output generation mode: 
+   - **Video + Audio**: Generates the final MP4 dubbed videos, WAV audio tracks, and translated SRTs.
+   - **Audio Only**: Generates the WAV mixed audio tracks and SRTs (faster if you don't need video rendering).
+   - **Subtitles & Metadata Only**: Skips voice synthesis completely! Generates translated `.srt` subtitles (Natural & Fitted), localized video titles, and descriptions for all selected languages in seconds, packaged in a single `.zip` archive.
 6. Click **Run Bulk Process** and wait. The software will process each language sequentially.
 
-> ⚡ **Memory Optimized**: In Bulk Mode, the pipeline translates ALL languages first, completely unloads the LLM, and then loads the Voice Synthesis AI. This prevents VRAM fragmentation and allows you to run massive multi-language batches efficiently even on an RTX 4090.
+> ⚡ **Ultra-Fast Subtitles & Metadata Mode**: When choosing "Subtitles & Metadata Only", voice cloning and audio mixing are bypassed, allowing you to generate multi-language YouTube subtitle packages and SEO descriptions in under 15 seconds!
 
 ![Bulk Mode Original Title & Description](bulk.jpg)
 
@@ -205,32 +225,71 @@ The built-in Help tab provides detailed usage instructions, troubleshooting tips
 
 ```python
 from modules.transcriber import Transcriber
+from modules.seo_assistant import YouTubeSEOAssistant
 from modules.reformulator import Reformulator
 from modules.tts_engine import TTSEngine
 
-# Transcribe
-transcriber = Transcriber()
-segments = transcriber.transcribe("video.mp4", language="en")
+# 1. Transcribe audio with WhisperX + Wav2Vec2 word alignment
+transcriber = Transcriber(model_size="large-v3")
+result = transcriber.transcribe("video.mp4", language="fr")
+segments = result["segments"]
 
-# Translate (Qwen2.5-7B-Instruct — translates + fits text to timing in one pass)
-reformulator = Reformulator()
+# 2. Generate YouTube SEO Kit (Title, Chapters, 4 Hashtags Packs, Description, Tags)
+seo = YouTubeSEOAssistant()
+seo_kit = seo.generate_full_seo_package(
+    segments,
+    current_title="Dragon Ball Nikolatoy",
+    source_lang="fr"
+)
+print("Title:", seo_kit["title"])
+print("Chapters:\n", seo_kit["chapters"])
+print("Tags:", seo_kit["tags"])
+
+# 3. Translate & Fit subtitles to timing in one pass
+reformulator = Reformulator(backend_name="Qwen2.5-7B-Instruct")
 reformulator.load_model()
-translated = reformulator.translate_segments(segments, source_lang="en",
-    target_lang_name="French", target_lang_code="fra_Latn", cps=13)
+translated = reformulator.translate_segments(
+    segments, 
+    source_lang="French",
+    target_lang_name="English", 
+    target_lang_code="en", 
+    cps=15.0
+)
 
-# Synthesize with voice cloning
+# 4. Synthesize with zero-shot voice cloning
 tts = TTSEngine()
-tts.load_model(voice_path="reference_voice.wav")
-result = tts.synthesize_segment("Bonjour le monde", "fra", "output.wav", voice_path="reference_voice.wav")
+tts.load_model(voice_path="vocals.wav")
+result = tts.synthesize_segment("Hello world", "en", "output.wav", voice_path="vocals.wav")
 ```
 
-### cURL (Gradio API)
+### JavaScript (Node.js / Web Fetch)
+
+```javascript
+// Query Gradio API endpoints programmatically
+async function translateVideo() {
+  const response = await fetch("http://localhost:7860/api/predict", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      data: [
+        "https://www.youtube.com/watch?v=XPLE57E7OBM",
+        "English"
+      ]
+    })
+  });
+  const data = await response.json();
+  console.log("Translation Result:", data);
+}
+translateVideo();
+```
+
+### cURL
 
 ```bash
-# When running, the Gradio API is available at the displayed URL
+# Query the live ZastTranslate server
 curl -X POST http://localhost:7860/api/predict \
   -H "Content-Type: application/json" \
-  -d '{"data": ["https://youtube.com/watch?v=..."]}'
+  -d '{"data": ["https://youtube.com/watch?v=XPLE57E7OBM"]}'
 ```
 
 ## Troubleshooting
@@ -279,6 +338,22 @@ MIT
 
 ## History
 
+- **Beta 1.10**
+  - **✨ Interactive YouTube SEO & Metadata Studio**: Auto-generates high-CTR search-intent video titles (natural sentence casing, front-loaded keywords, brand capitalization for *Hermès Agent*, *Windows*, *IA*, *API*, *ChatGPT*).
+  - **⏱️ Full-Duration Uniform Chapter Generator**: Samples the entire video timeline from `00:00` to the very end (fixing early cutoffs on long 20+ min videos) and applies intelligent spacing rules (1 to 3 min between major milestones).
+  - **🎯 Technical Landmark & Tool Detector**: Automatically scans transcript cues for key tool integrations (*Ollama*, *Qwen Local LLM*, *Telegram Bot*, *Smartphone Remote Control*, *API Configuration*, *Automated Jobs*) and generates dedicated, named timestamped chapters for each major feature.
+  - **⚡ Subtitles & Metadata Only Bulk Mode**: Added a dedicated output generation mode in Bulk Mode allowing creators to generate translated SRT subtitles (Natural & Fitted), localized titles, and descriptions across multiple languages in under 15 seconds without running voice synthesis or video rendering.
+  - **📝 Rich Plain-Text Descriptions (300+ words)**: Formatted strictly without markdown asterisks (`**`) for clean, direct copy-pasting to YouTube Studio, complete with hook, overview, bullet points, resources, and call to action.
+  - **🏷️ 4 Thematic Hashtag Packs with UI Visibility**: Displays the exact hashtags directly on the interactive radio choices (*Subject & Tool*, *Format & Tuto*, *Tech & Ecosystem*, *Trends & Dev*) with instant description switching.
+  - **🔍 Smart Search Trend Disambiguation**: Queries live YouTube Autocomplete without homonym pollution (excludes fashion/clothing keywords for tech subjects).
+  - **🧹 Filler & Hesitation Removal in Translation**: Refactored translation prompts to eliminate false starts and verbal stammers (*"one time, well, every time"* -> fluent, natural idiomatic target phrasing).
+  - **🎨 Universal Ergonomic Scrollbars**: Applied custom styled scrollbars and vertical resize handles across all textboxes, tables, markdown outputs, and file lists.
+- **Beta 1.09**
+  - **YouTube SEO & Description Studio**: Added a dedicated interactive studio in the Transcription tab (`modules/seo_assistant.py`) allowing creators to instantly generate complete YouTube publishing kits from their subtitle stream and live trending data.
+  - **Automatic YouTube Chapters Generation**: The LLM analyzes the Wav2Vec2 timestamped subtitle cues to automatically extract topic shifts and output YouTube-compliant chapter timecodes (`00:00 - Introduction`, `MM:SS - Chapter Title`).
+  - **Live YouTube Trending Keyword Suggestions**: Integrated live YouTube Autocomplete search discovery (zero API key required) to identify high-volume search queries and enrich generated video tags and titles.
+  - **Thematic Hashtag Packages**: Offers 4 distinct targeted hashtag packages (Subject-Specific, General Tech/AI, Local Hardware/LLM, and Productivity/Automation) with 1-click selection and real-time description updates.
+  - **Seamless Downstream Translation & Bulk Metadata Pipeline**: Added a 1-click `📥 Appliquer aux Métadonnées` action that seamlessly populates `state.video_info`, Single Translation (`original_title_input`, `original_desc_input`), and Bulk Mode (`bulk_title_input`, `bulk_desc_input`), ensuring generated descriptions and titles are automatically translated across all target languages.
 - **Beta 1.08**
   - **NVIDIA RTX 50-Series Support (Blackwell / `sm_120`)**: Upgraded PyTorch backend to CUDA 12.8 (`cu128`), introducing full native support for NVIDIA GeForce RTX 5070, RTX 5070 Ti, RTX 5080, and RTX 5090 GPUs (compute capability `sm_120`), resolving `CUDA capability sm_120 is not compatible` errors during Demucs audio separation and model inference.
   - **WhisperX AI & Tech Context Priming (`initial_prompt`)**: Injected a comprehensive AI/tech domain context prompt (`Claude.ai`, `ChatGPT`, `Anthropic`, `Pinokio`, `Midjourney`, etc.) combined with imported video titles into WhisperX's autoregressive decoder. This eliminates phonetic acoustic hallucinations (such as transcribing "Claude.ai" as "CloudEye").
@@ -342,3 +417,85 @@ MIT
   - Added Bulk Mode (generate multiple languages in one click).
 - **Version 0.9** 
   - Initial release.
+
+---
+
+## 📡 API Documentation
+
+ZastTranslate exposes a full programmatic API through Gradio Client, Python, JavaScript, and cURL.
+
+### 1. Python (Gradio Client)
+
+```python
+from gradio_client import Client, handle_file
+
+# Connect to local ZastTranslate instance
+client = Client("http://127.0.0.1:7860/")
+
+# 1. Import Video
+import_res = client.predict(
+    source_type="Local file",
+    url="",
+    file=handle_file("D:/videos/my_video.mp4"),
+    youtube_resolution="best",
+    api_name="/step1_import"
+)
+print("Import status:", import_res[1])
+
+# 2. Run Transcription
+trans_res = client.predict(
+    lang_source="French",
+    model_size="large-v3",
+    api_name="/step2_transcribe"
+)
+
+# 3. Generate YouTube SEO Kit
+seo_res = client.predict(
+    transcription_df=trans_res[1],
+    selected_pack="Pack 1 (Sujet & Outil)",
+    lang_source="French",
+    api_name="/step2_generate_seo_metadata"
+)
+print("SEO Title:", seo_res[0])
+print("SEO Description:\n", seo_res[3])
+```
+
+### 2. JavaScript / TypeScript (@gradio/client)
+
+```javascript
+import { Client } from "@gradio/client";
+
+async function runTranslation() {
+  const app = await Client.connect("http://127.0.0.1:7860/");
+
+  // Run Translation on current validated project
+  const result = await app.predict("/step4_translate", [
+    "English",
+    "Tutoriel Hermès Agent : Guide complet sur Windows",
+    "Description complète..."
+  ]);
+
+  console.log("Translation status:", result.data[0]);
+}
+
+runTranslation();
+```
+
+### 3. cURL (HTTP REST API)
+
+```bash
+# Check server status and available endpoints
+curl http://127.0.0.1:7860/info
+
+# Trigger SEO metadata generation via HTTP JSON POST
+curl -X POST http://127.0.0.1:7860/api/predict/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fn_index": 12,
+    "data": [
+      null,
+      "Pack 1 (Sujet & Outil)",
+      "French"
+    ]
+  }'
+```

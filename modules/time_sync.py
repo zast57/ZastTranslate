@@ -201,7 +201,7 @@ class TimeSync:
                     # This works for any TTS backend regardless of speaking rate
                     scale = (effective_duration / current_duration) * 0.90
                     target_chars = max(10, int(len(current_text) * scale))
-                    print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}] ({lang_tag}): {overflow:.2f}s over → LLM reformulation {attempt+1}/3 (≤{target_chars} chars)")
+                    print(f"Segment [{segment['start']:.1f}-{segment['end']:.1f}] ({lang_tag}): {overflow:.2f}s over -> LLM reformulation {attempt+1}/3 (<={target_chars} chars)")
                     try:
                         shorter_text = self.reformulator.shorten(current_text, target_chars, language)
                     except Exception as e:

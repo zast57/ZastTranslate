@@ -24,9 +24,9 @@ from modules.llm_backends.factory import get_backend as get_llm_backend, get_ava
 from modules.time_sync import TimeSync
 from modules.audio_mixer import AudioMixer
 from modules.video_assembler import VideoAssembler
-from modules.video_assembler import VideoAssembler
 from modules.srt_parser import SRTParser
 from modules.youtube_publisher import YouTubePublisher
+from modules.seo_assistant import seo_assistant
 from fitted_cps_config import get_fitted_cps, get_effective_cps, load_user_cps, save_user_cps, FITTED_CPS_BY_LANG
 
 import pandas as pd
@@ -177,6 +177,8 @@ class AppState:
         self.synced_segments = []
         self.temp_dir = TEMP_DIR
         self.keep_models = False
+        self.bulk_results = {'localizations': {}, 'srts': {}}
+        self.seo_package = None
         
 state = AppState()
 
@@ -251,6 +253,7 @@ def reset_project():
     state.segments = []
     state.translated_segments = []
     state.synced_segments = []
+    state.seo_package = None
     # Clean temp directory
     from config import TEMP_DIR, BASE_DIR
     if os.path.exists(TEMP_DIR):
@@ -282,7 +285,12 @@ def reset_project():
         "",                                  # original_desc_input
         "",                                  # translated_title_input
         "",                                  # translated_desc_input
-        gr.update(visible=False)             # btn_import_metadata_single
+        gr.update(visible=False),            # btn_import_metadata_single
+        "",                                  # seo_title_out
+        "",                                  # seo_tags_out
+        "",                                  # seo_chapters_out
+        "",                                  # seo_desc_out
+        ""                                   # seo_status
     )
 
 
@@ -306,18 +314,19 @@ def step0_check_url(url):
 
 
 def step1_download(url, local_file, resolution, progress=gr.Progress()):
-    progress(0, "Downloading...")
     try:
         is_audio = False
         if url:
-            info = downloader.download(url, resolution=resolution)
+            progress(0.02, "Connecting to YouTube...")
+            info = downloader.download(url, resolution=resolution, progress_callback=progress)
             show_btn = gr.update(visible=True)
         elif local_file:
+            progress(0.05, "Reading uploaded file...")
             filepath = local_file.name if hasattr(local_file, 'name') else local_file
             ext = os.path.splitext(filepath)[1].lower()
             if ext in [".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac"]:
                 is_audio = True
-            info = downloader.import_local(filepath)
+            info = downloader.import_local(filepath, progress_callback=progress)
             show_btn = gr.update(visible=False)
         else:
             raise ValueError("Please provide a YouTube URL or a local file.")
@@ -341,7 +350,7 @@ def step1_download(url, local_file, resolution, progress=gr.Progress()):
                 show_btn,
                 show_publish_btn,
                 show_publish_status,
-                gr.update(value="Audio Only", choices=["Audio Only"]),
+                gr.update(value="Audio Only", choices=["Audio Only", "Subtitles & Metadata Only"]),
                 gr.update(visible=False, value=None),
                 show_btn
             )
@@ -354,7 +363,7 @@ def step1_download(url, local_file, resolution, progress=gr.Progress()):
                 show_btn,
                 show_publish_btn,
                 show_publish_status,
-                gr.update(value="Video + Audio", choices=["Video + Audio", "Audio Only"]),
+                gr.update(value="Video + Audio", choices=["Video + Audio", "Audio Only", "Subtitles & Metadata Only"]),
                 gr.update(visible=True, value=None),
                 show_btn
             )
@@ -367,7 +376,7 @@ def step1_download(url, local_file, resolution, progress=gr.Progress()):
             gr.update(visible=False),
             gr.update(visible=False),
             gr.update(visible=False),
-            gr.update(value="Video + Audio", choices=["Video + Audio", "Audio Only"]),
+            gr.update(value="Video + Audio", choices=["Video + Audio", "Audio Only", "Subtitles & Metadata Only"]),
             gr.update(visible=True),
             gr.update(visible=False)
         )
@@ -540,6 +549,21 @@ def step2b_import_srt(srt_file, lang_source):
 
 def step2_clean_transcription(df_data, lang_source, progress=gr.Progress()):
     """Clean oral fillers and polish transcription text in the editor."""
+    if df_data is not None:
+        rows = _dataframe_to_rows(df_data)
+        new_segments = []
+        for row in rows:
+            try:
+                start = float(row[0])
+                end = float(row[1])
+                text = str(row[2])
+                if text.strip():
+                    new_segments.append({"start": start, "end": end, "text": text})
+            except Exception:
+                pass
+        if new_segments:
+            state.segments = new_segments
+
     if not state.segments:
         return "No transcription to clean.", df_data, _get_segments_json_html()
     
@@ -569,6 +593,136 @@ def step2_clean_transcription(df_data, lang_source, progress=gr.Progress()):
             seg['text']
         ])
     return f"Transcription cleaned ({len(data)} segments). Fillers removed and timings synced.", data, _get_segments_json_html()
+
+def step2_generate_seo_metadata(df_data, selected_pack, lang_source="Auto", progress=gr.Progress()):
+    """Generate complete YouTube SEO Kit (Title, Chapters, 4 Hashtags Packs, Description, Tags)."""
+    # Sync segments from dataframe if available
+    if df_data is not None:
+        rows = _dataframe_to_rows(df_data)
+        new_segments = []
+        for row in rows:
+            try:
+                start = float(row[0])
+                end = float(row[1])
+                text = str(row[2])
+                if text.strip():
+                    new_segments.append({"start": start, "end": end, "text": text})
+            except Exception:
+                pass
+        if new_segments:
+            state.segments = new_segments
+
+    if not state.segments:
+        return "", "", "", "", "⚠️ No transcription available. Please transcribe a video or import an SRT first."
+
+    progress(0.2, "Searching live YouTube trends & Analyzing topics...")
+    current_title = state.video_info.get("title", "") if state.video_info else ""
+    
+    # Determine exact source language
+    source_lang_map = {
+        "French": "fr", "English": "en", "Spanish": "es", "German": "de",
+        "Italian": "it", "Portuguese": "pt", "Japanese": "ja", "Korean": "ko",
+        "Chinese": "zh", "Russian": "ru", "Arabic": "ar", "Hindi": "hi",
+        "Dutch": "nl", "Polish": "pl", "Turkish": "tr", "Swedish": "sv",
+        "Czech": "cs", "Romanian": "ro", "Hungarian": "hu",
+    }
+    src_lang = None
+    if lang_source and lang_source != "Auto":
+        src_lang = source_lang_map.get(lang_source)
+    if not src_lang and state.video_info:
+        src_lang = state.video_info.get("detected_language") or state.video_info.get("language")
+    if not src_lang and state.segments:
+        sample_text = " ".join(s.get("text", "") for s in state.segments[:10]).lower()
+        fr_markers = [" le ", " la ", " les ", " un ", " une ", " des ", " dans ", " pour ", " avec ", " vous ", " nous ", " est ", " sont ", " c'est "]
+        if any(m in sample_text for m in fr_markers):
+            src_lang = "fr"
+        else:
+            src_lang = "en"
+    if not src_lang:
+        src_lang = "fr"
+    
+    # Load LLM backend if available for high-quality title and chapter generation
+    llm_backend = getattr(reformulator, "llm", None)
+    if llm_backend is None:
+        try:
+            reformulator.load_model()
+            llm_backend = getattr(reformulator, "llm", None)
+        except Exception as e:
+            print(f"[SEO Assistant] LLM load note: {e}")
+
+    progress(0.6, "Generating SEO title, timestamped chapters, description and tags...")
+    pkg = seo_assistant.generate_full_seo_package(
+        state.segments,
+        current_title=current_title,
+        source_lang=src_lang,
+        llm_backend=llm_backend
+    )
+    state.seo_package = pkg
+
+    # Apply selected hashtag pack if different from default
+    packs = pkg.get("hashtag_packs", {})
+    p1 = packs.get("Pack 1: Subject & Specific", "#Tech #IA")
+    p2 = packs.get("Pack 2: Review & Unboxing", "#Tutoriel #Guide")
+    p3 = packs.get("Pack 3: Collector & Tech", "#IntelligenceArtificielle #Productivite")
+    p4 = packs.get("Pack 4: Community & Trends", "#Innovation #Dev #Tendance")
+    
+    pack_choices = [
+        f"Pack 1 (Sujet & Outil) : {p1}",
+        f"Pack 2 (Format & Tuto) : {p2}",
+        f"Pack 3 (Tech & Écosystème) : {p3}",
+        f"Pack 4 (Tendances & Dev) : {p4}"
+    ]
+
+    trends_str = ", ".join(pkg.get("trends", [])[:6]) if pkg.get("trends") else "Auto-detected"
+    status_msg = f"✅ **SEO Kit & Chapters generated successfully!**\n\n*Live YouTube Trends:* `{trends_str}`"
+
+    return (
+        pkg["title"],
+        pkg["tags"],
+        pkg["chapters"],
+        pkg["description"],
+        gr.update(choices=pack_choices, value=pack_choices[0]),
+        status_msg
+    )
+
+def step2_change_hashtag_pack(selected_pack, current_desc):
+    """Dynamically switch the hashtag pack in the generated description."""
+    if not selected_pack or not current_desc:
+        return current_desc
+    
+    # Extract hashtags directly if present in choice string
+    if ":" in selected_pack and "#" in selected_pack:
+        new_hashtags = selected_pack.split(":", 1)[1].strip()
+    elif state.seo_package:
+        packs = state.seo_package.get("hashtag_packs", {})
+        new_hashtags = packs.get(selected_pack, "")
+    else:
+        new_hashtags = ""
+        
+    if not new_hashtags:
+        return current_desc
+    
+    lines = current_desc.strip().splitlines()
+    if lines and lines[-1].startswith("#"):
+        lines[-1] = new_hashtags
+    else:
+        lines.append("")
+        lines.append(new_hashtags)
+    return "\n".join(lines)
+
+def step2_apply_seo_metadata(seo_title, seo_desc):
+    """Apply generated SEO title and description to state and translation inputs."""
+    if not seo_title and not seo_desc:
+        return "", "", "", "", "⚠️ Please generate or enter a title and description first."
+        
+    if state.video_info:
+        if seo_title:
+            state.video_info["title"] = seo_title
+        if seo_desc:
+            state.video_info["description"] = seo_desc
+            
+    status_msg = "✅ **Title and Description applied successfully!** Ready for Translation (Tab 3) and Bulk Mode (Tab 5)."
+    return seo_title, seo_desc, seo_title, seo_desc, status_msg
 
 def _dataframe_to_rows(data):
     """Convert Gradio Dataframe output to list of lists, handling all formats."""
@@ -1193,7 +1347,7 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
             pass
 
     # Ensure vocals and background audio are prepared and present on disk
-    if state.video_info:
+    if state.video_info and output_type != "Subtitles & Metadata Only":
         yield "Ensuring background and vocals are prepared...", output_files, metadata_display
         try:
             ensure_vocals_and_reference_audio()
@@ -1205,8 +1359,12 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
     all_translated_segments = {}
     for idx, target_lang in enumerate(target_langs):
         # Progress math setup
-        base_progress = (idx / total_langs) * 0.5
-        prog_step = 0.5 / total_langs
+        if output_type == "Subtitles & Metadata Only":
+            base_progress = (idx / total_langs)
+            prog_step = 1.0 / total_langs
+        else:
+            base_progress = (idx / total_langs) * 0.5
+            prog_step = 0.5 / total_langs
         
         target_lang_code = LANGUAGES.get(target_lang, target_lang)
         iso = _get_iso_code(target_lang_code)
@@ -1296,6 +1454,29 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
     # CRITICAL: Clean up LLM from VRAM completely before loading TTS
     if not state.keep_models:
         reformulator.cleanup()
+        
+    # If Subtitles & Metadata Only, skip TTS and finish immediately
+    if output_type == "Subtitles & Metadata Only":
+        meta_md_path = os.path.join(OUTPUT_DIR, "metadata_translations.md")
+        if os.path.exists(meta_md_path) and meta_md_path not in output_files:
+            output_files.append(meta_md_path)
+        meta_json_path = os.path.join(OUTPUT_DIR, "metadata_translations.json")
+        if os.path.exists(meta_json_path) and meta_json_path not in output_files:
+            output_files.append(meta_json_path)
+
+        import zipfile
+        zip_path = os.path.join(OUTPUT_DIR, "bulk_export_all.zip")
+        try:
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for f in output_files:
+                    if os.path.exists(f):
+                        zipf.write(f, os.path.basename(f))
+            output_files.insert(0, zip_path)
+        except Exception as e:
+            print(f"Failed to create ZIP: {e}")
+
+        yield f"Completed! Generated subtitles & metadata for {total_langs} languages.", output_files, metadata_display
+        return
     
     # Phase 2: Synthesize ALL languages
     # Determine voice path ONCE before loading model
@@ -1480,6 +1661,34 @@ html, body {
     height: auto !important;
     min-height: 100vh !important;
     max-width: 98% !important;
+}
+/* Ensure all multiline textboxes & textareas have visible, usable scrollbars and vertical resize */
+textarea, .gradio-textbox textarea {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    resize: vertical !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: #6366f1 rgba(0, 0, 0, 0.1) !important;
+    line-height: 1.5 !important;
+    font-family: inherit !important;
+}
+
+/* Universal scrollbar styling for textareas, dataframes, markdown previews and file lists */
+.gradio-container *::-webkit-scrollbar {
+    width: 8px !important;
+    height: 8px !important;
+    display: block !important;
+}
+.gradio-container *::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.06) !important;
+    border-radius: 4px !important;
+}
+.gradio-container *::-webkit-scrollbar-thumb {
+    background: #6366f1 !important;
+    border-radius: 4px !important;
+}
+.gradio-container *::-webkit-scrollbar-thumb:hover {
+    background: #4f46e5 !important;
 }
 """
 BLOCKS_JS = """
@@ -1693,7 +1902,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         with open(_logo_path, "rb") as _f:
             _logo_b64 = _b64.b64encode(_f.read()).decode()
         _logo_html = f"<center><img src='data:image/png;base64,{_logo_b64}' width='80' /></center>\n\n"
-    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta 1.08\n**Offline video translation & dubbing (No Lip-Sync)**")
+    gr.Markdown(f"{_logo_html}# 🎬 ZastTranslate — Beta {APP_VERSION}\n**Offline video translation & dubbing (No Lip-Sync)**")
     
     with gr.Row():
         with gr.Column(scale=2, min_width=300):
@@ -1786,6 +1995,30 @@ with gr.Blocks(title="ZastTranslate") as app:
                     btn_export_transcription = gr.Button("Export SRT 💾", variant="secondary")
                     btn_open_output_tab2 = gr.Button("📂 Open Folder", variant="secondary")
                 export_transcription_file = gr.File(label="Download SRT")
+                
+                with gr.Accordion("🚀 YouTube SEO & Description Studio (Chapters, Hashtags & Tags)", open=False):
+                    gr.Markdown("Automatically generate an optimized YouTube publishing kit (SEO Title, Timestamped Chapters, 4 Hashtag Packs, Full Description, and Tags) based on your subtitles and live search trends.")
+                    with gr.Row():
+                        seo_hashtag_pack = gr.Radio(
+                            choices=[
+                                "Pack 1: Subject & Specific",
+                                "Pack 2: Review & Unboxing",
+                                "Pack 3: Collector & Tech",
+                                "Pack 4: Community & Trends"
+                            ],
+                            value="Pack 1: Subject & Specific",
+                            label="Recommended Hashtag Pack"
+                        )
+                        btn_generate_seo = gr.Button("✨ Generate Metadata, Chapters & SEO", variant="primary")
+                    with gr.Row():
+                        seo_title_out = gr.Textbox(label="Proposed Video Title (SEO)", lines=2, max_lines=4, interactive=True, buttons=["copy"])
+                        seo_tags_out = gr.Textbox(label="YouTube Tags (Ready for YouTube Studio)", lines=4, max_lines=10, interactive=True, buttons=["copy"])
+                    with gr.Row():
+                        seo_chapters_out = gr.Textbox(label="Chapters & Summary (YouTube Timestamps)", lines=8, max_lines=20, interactive=True, buttons=["copy"])
+                        seo_desc_out = gr.Textbox(label="Full YouTube Description", lines=12, max_lines=30, interactive=True, buttons=["copy"])
+                    with gr.Row():
+                        btn_apply_seo = gr.Button("📥 Apply to Translation & Bulk Metadata (Tabs 3 & 5)", variant="secondary")
+                    seo_status = gr.Markdown(value="")
         
             with gr.Tab("3. Translation") as tab3:
                 lang_target = gr.Dropdown(INITIAL_VALID_LANGS, label="Target Language", value=INITIAL_LANG_VALUE)
@@ -1793,13 +2026,13 @@ with gr.Blocks(title="ZastTranslate") as app:
                 with gr.Row():
                     with gr.Column(scale=4):
                         original_title_input = gr.Textbox(label="Original Video Title (Optional)", placeholder="Title...")
-                        original_desc_input = gr.Textbox(label="Original Video Description (Optional)", placeholder="Description...", lines=3)
+                        original_desc_input = gr.Textbox(label="Original Video Description (Optional)", placeholder="Description...", lines=4, max_lines=15)
                     with gr.Column(scale=1):
                         btn_import_metadata_single = gr.Button("⬇️ Import from URL", variant="secondary", visible=False)
                 
                 with gr.Row():
                     translated_title_input = gr.Textbox(label="Translated Video Title", placeholder="Translated Title...", buttons=["copy"])
-                    translated_desc_input = gr.Textbox(label="Translated Video Description", placeholder="Translated Description...", lines=3, buttons=["copy"])
+                    translated_desc_input = gr.Textbox(label="Translated Video Description", placeholder="Translated Description...", lines=4, max_lines=15, buttons=["copy"])
                 
                 btn_translate = gr.Button("Run Translation", interactive=False, variant="primary")
                 translation_status = gr.Textbox(label="Status", interactive=False)
@@ -1899,7 +2132,7 @@ with gr.Blocks(title="ZastTranslate") as app:
                 with gr.Row():
                     with gr.Column(scale=4):
                         bulk_title_input = gr.Textbox(label="Original Video Title (Optional)", placeholder="Title...")
-                        bulk_desc_input = gr.Textbox(label="Original Video Description (Optional)", placeholder="Description...", lines=3)
+                        bulk_desc_input = gr.Textbox(label="Original Video Description (Optional)", placeholder="Description...", lines=4, max_lines=15)
                     with gr.Column(scale=1):
                         btn_import_metadata = gr.Button("⬇️ Import from URL", variant="secondary", visible=False)
                 
@@ -1916,10 +2149,10 @@ with gr.Blocks(title="ZastTranslate") as app:
                         visible=True
                     )
                     bulk_output_type = gr.Radio(
-                        ["Video + Audio", "Audio Only"],
+                        ["Video + Audio", "Audio Only", "Subtitles & Metadata Only"],
                         label="Output Generation",
                         value="Video + Audio",
-                        info="'Video + Audio' will render the final MP4. 'Audio Only' will just output the WAV track."
+                        info="'Video + Audio' renders MP4. 'Audio Only' outputs WAV. 'Subtitles & Metadata Only' skips voice synthesis to output localized SRTs, titles, and descriptions in seconds."
                     )
                     
                 bulk_voice_file = gr.File(label="Voice sample file (WAV/MP3, 10-30s of clear speech)", visible=False)
@@ -1972,9 +2205,9 @@ with gr.Blocks(title="ZastTranslate") as app:
                         "💡 Audio files are automatically processed without video packaging (audio-only outputs in Dubbing and Bulk Mode)."
                     )
                 
-                with gr.Accordion("🎤 Tab 2 — Transcription", open=False):
+                with gr.Accordion("🎤 Tab 2 — Transcription & SEO Studio", open=False):
                     gr.Markdown(
-                        "This step separates vocals from background music (Demucs), then transcribes the speech (WhisperX).\n\n"
+                        "This step separates vocals from background music (Demucs), transcribes speech (WhisperX), and generates a complete YouTube SEO publication kit.\n\n"
                         "**Options:**\n"
                         "- **Source Language** — Select the spoken language from 20+ languages, or leave on *Auto* for auto-detection. "
                         "Setting it manually improves accuracy.\n"
@@ -1982,12 +2215,21 @@ with gr.Blocks(title="ZastTranslate") as app:
                         "  - `base` — Fast, lower accuracy (good for testing)\n"
                         "  - `small` / `medium` — Balanced\n"
                         "  - `large-v3` — Best accuracy, uses more VRAM (~3 GB)\n\n"
-                        "**After transcription:**\n"
-                        "- Review and edit the table (Start, End, Text). You can fix mistakes, split/merge segments.\n"
-                        "- Click **Export SRT 💾** to download subtitles.\n\n"
+                        "**Transcription Tools:**\n"
+                        "- **🧹 Clean Fillers & Oral Tics** — Automatically filters out speech hesitations (*euh*, *um*, *ben*, *you know*, *like*) and false starts while maintaining strict millisecond synchronization.\n"
+                        "- **Review & Edit** — Directly edit the table (Start, End, Text). Split or merge rows as needed.\n"
+                        "- **Export SRT 💾** — Download subtitles locally in UTF-8.\n\n"
+                        "**🚀 YouTube SEO & Description Studio:**\n"
+                        "- Click **✨ Generate Metadata, Chapters & SEO** to create:\n"
+                        "  - **High-CTR Video Title** — Formatted in natural sentence case with front-loaded search intent and brand normalization (*Hermès Agent*, *Windows*, *IA*, *API*, *ChatGPT*).\n"
+                        "  - **⏱️ Full Timeline Chapters & Landmarks** — Samples 100% of the video duration (from 00:00 to the end) and automatically detects major tools (*Ollama*, *Qwen Local LLM*, *Telegram*, *Smartphone Remote Control*, *Jobs*).\n"
+                        "  - **📝 300+ Word Description** — Clean plain text without broken markdown asterisks (`**`), including hook, feature overview, bullet points, and calls to action.\n"
+                        "  - **🏷️ 4 Strategic Hashtag Packs** — Displayed directly on interactive radio buttons (Subject, Tutorial, Tech Stack, Trends) with instant 1-click description updating.\n"
+                        "  - **🔍 Live YouTube Search Suggestion Mining** — Queries Google's live autocompletion endpoint in real time to rank for what users are actually searching right now on YouTube, with automatic fashion/homonym disambiguation.\n"
+                        "- Click **📋 Apply to Translation & Bulk** to forward the generated title and description to Tab 3 (Single Translation) and Tab 5 (Bulk Mode).\n\n"
                         "⚠️ **You MUST click 'Validate Transcription ✅' before going to the Translation tab.** "
-                        "Without validation, the next step will not have any data to work with.\n\n"
-                        "**Alternative:** You can skip transcription entirely by importing an existing **SRT file** instead."
+                        "Without validation, downstream translation steps will not have data to work with.\n\n"
+                        "**Alternative:** You can skip transcription entirely by importing an existing **SRT file**."
                     )
                 
                 with gr.Accordion("🌍 Tab 3 — Translation", open=False):
@@ -2047,15 +2289,17 @@ with gr.Blocks(title="ZastTranslate") as app:
                     gr.Markdown(
                         "Automate translation and dubbing for multiple languages simultaneously.\n\n"
                         "**How it works:**\n"
-                        "1. Select all the target languages from the dropdown.\n"
-                        "2. Optionally, provide the **Original Video Title** and **Description**, or click **⬇️ Import from URL** to fetch them automatically if you used a YouTube link.\n"
-                        "3. Configure your **Voice Mode** and **Output Generation** preferences (Video+Audio or Audio Only).\n"
-                        "4. Click **Run Bulk Process**. The system handles all translations first, then all audio synthesis, and packages everything in a ZIP file.\n\n"
+                        "1. Select all target languages from the dropdown.\n"
+                        "2. Optionally, provide the **Original Video Title** and **Description**, or click **⬇️ Import from URL** / **📥 Apply to Translation & Bulk**.\n"
+                        "3. Select your **Output Generation** mode:\n"
+                        "   - `Video + Audio`: Generates dubbed MP4 videos, WAV tracks, and translated SRTs.\n"
+                        "   - `Audio Only`: Generates WAV tracks and translated SRTs without video rendering.\n"
+                        "   - `Subtitles & Metadata Only`: Bypasses voice synthesis completely to produce localized SRT subtitles (Natural & Fitted), titles, and descriptions across all languages in under 15 seconds!\n"
+                        "4. Click **Run Bulk Process**. The system executes the requested pipeline and packages all results into `bulk_export_all.zip`.\n\n"
                         "**YouTube Publishing (🔴 Publish Metadata & Subtitles to YouTube):**\n"
-                        "- This button appears if you imported the video via a YouTube URL.\n"
-                        "- It allows you to automatically upload the translated title, description, and subtitles (SRT) directly to your YouTube video.\n"
-                        "- **Prerequisites**: You must have a Google Cloud API `client_secret.json` file (with YouTube Data API v3 enabled) placed in the application folder (`ZastTranslate/client_secret.json`). You must also own the YouTube channel.\n"
-                        "- **Usage**: After the Bulk Process completes, click this button to upload the localized data to YouTube."
+                        "- Appears if you imported the video via a YouTube URL.\n"
+                        "- Automatically uploads translated titles, descriptions, and SRT subtitles directly to your YouTube video.\n"
+                        "- **Prerequisites**: Place your Google Cloud `client_secret.json` file in the application root directory with YouTube Data API v3 enabled."
                     )
         
                 with gr.Accordion("🔧 Troubleshooting", open=False):
@@ -2191,7 +2435,8 @@ with gr.Blocks(title="ZastTranslate") as app:
             btn_import_metadata, btn_youtube_publish, bulk_publish_status,
             bulk_output_type, final_video_out, segments_json_holder, dubbing_segments_df,
             original_title_input, original_desc_input, translated_title_input, translated_desc_input,
-            btn_import_metadata_single
+            btn_import_metadata_single,
+            seo_title_out, seo_tags_out, seo_chapters_out, seo_desc_out, seo_status
         ]
     )
     
@@ -2202,6 +2447,24 @@ with gr.Blocks(title="ZastTranslate") as app:
     btn_clean_transcription.click(step2_clean_transcription, [transcription_df, lang_source], [transcription_status, transcription_df, segments_json_holder], show_progress="full")
     btn_export_transcription.click(export_transcription_srt, [], [transcription_status, export_transcription_file])
     btn_open_output_tab2.click(open_output_folder, [], [])
+    
+    # SEO Studio Events
+    btn_generate_seo.click(
+        step2_generate_seo_metadata,
+        [transcription_df, seo_hashtag_pack, lang_source],
+        [seo_title_out, seo_tags_out, seo_chapters_out, seo_desc_out, seo_hashtag_pack, seo_status],
+        show_progress="full"
+    )
+    seo_hashtag_pack.change(
+        step2_change_hashtag_pack,
+        [seo_hashtag_pack, seo_desc_out],
+        [seo_desc_out]
+    )
+    btn_apply_seo.click(
+        step2_apply_seo_metadata,
+        [seo_title_out, seo_desc_out],
+        [original_title_input, original_desc_input, bulk_title_input, bulk_desc_input, seo_status]
+    )
     
     btn_import_metadata_single.click(import_metadata_from_state, [], [original_title_input, original_desc_input])
     
@@ -2287,6 +2550,22 @@ with gr.Blocks(title="ZastTranslate") as app:
         
     voice_mode.change(toggle_voice_inputs, inputs=[voice_mode], outputs=[voice_file, default_voice_gender])
     bulk_voice_mode.change(toggle_voice_inputs, inputs=[bulk_voice_mode], outputs=[bulk_voice_file, bulk_default_voice_gender])
+    
+    def on_bulk_output_type_change(choice, mode):
+        is_sub_only = (choice == "Subtitles & Metadata Only")
+        return (
+            gr.update(visible=not is_sub_only), # bulk_voice_mode
+            gr.update(visible=(mode == "Clone from file" and not is_sub_only)), # bulk_voice_file
+            gr.update(visible=(mode == "Default voice" and not is_sub_only)), # bulk_default_voice_gender
+            gr.update(visible=not is_sub_only), # bulk_never_cut_mode
+            gr.update(visible=False) # bulk_never_cut_warning
+        )
+    
+    bulk_output_type.change(
+        on_bulk_output_type_change,
+        inputs=[bulk_output_type, bulk_voice_mode],
+        outputs=[bulk_voice_mode, bulk_voice_file, bulk_default_voice_gender, bulk_never_cut_mode, bulk_never_cut_warning]
+    )
     
     keep_models_ui.change(lambda x: setattr(state, 'keep_models', x), inputs=[keep_models_ui], outputs=[])
     btn_import_metadata.click(import_metadata_from_state, [], [bulk_title_input, bulk_desc_input])
@@ -2488,12 +2767,27 @@ with gr.Blocks(title="ZastTranslate") as app:
     )
 
 if __name__ == "__main__":
+    import os
+    import sys
+    port = int(os.environ.get("GRADIO_SERVER_PORT", 7860))
+    if len(sys.argv) > 1 and sys.argv[1].isdigit():
+        port = int(sys.argv[1])
     app.queue() # Enable websocket queue to prevent GPU process thread deadlocks
-    app.launch(
-        server_name="127.0.0.1",
-        server_port=7860,
-        theme=gr.themes.Soft(),
-        allowed_paths=[BASE_DIR],
-        js=BLOCKS_JS,
-        css=BLOCKS_CSS,
-    )
+    try:
+        app.launch(
+            server_name="127.0.0.1",
+            server_port=port,
+            theme=gr.themes.Soft(),
+            allowed_paths=[BASE_DIR],
+            js=BLOCKS_JS,
+            css=BLOCKS_CSS,
+        )
+    except OSError:
+        # Port is already bound -> automatically pick next available open port
+        app.launch(
+            server_name="127.0.0.1",
+            theme=gr.themes.Soft(),
+            allowed_paths=[BASE_DIR],
+            js=BLOCKS_JS,
+            css=BLOCKS_CSS,
+        )

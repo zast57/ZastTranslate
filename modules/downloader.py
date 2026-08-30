@@ -58,9 +58,9 @@ class VideoDownloader:
             print(f"yt-dlp check error: {e}")
             raise
 
-    def download(self, url, resolution="1080p"):
+    def download(self, url, resolution="1080p", progress_callback=None):
         """
-        Download video via yt-dlp.
+        Download video via yt-dlp with real-time progress updates.
         Returns {"video_path": str, "audio_16k": str, "audio_44k": str, "duration": float, "title": str}
         """
         # No container restriction: ffmpeg merges any codec pair into mp4 via merge_output_format
@@ -70,6 +70,18 @@ class VideoDownloader:
             height = resolution.replace("p", "")
             fmt = f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best"
 
+        def ytdl_hook(d):
+            if progress_callback and d.get('status') == 'downloading':
+                total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
+                downloaded = d.get('downloaded_bytes') or 0
+                if total > 0:
+                    pct = max(0.05, min(0.85, (downloaded / total) * 0.85))
+                    speed = d.get('speed')
+                    speed_mb = f" ({speed / 1024 / 1024:.1f} MB/s)" if speed else ""
+                    progress_callback(pct, f"Downloading video... {int((downloaded / total) * 100)}%{speed_mb}")
+            elif progress_callback and d.get('status') == 'finished':
+                progress_callback(0.88, "Extracting audio and processing formats...")
+
         ydl_opts = {
             **_ydl_base_opts(),
             'format': fmt,
@@ -78,9 +90,12 @@ class VideoDownloader:
             'noplaylist': True,
             'quiet': True,
             'restrictfilenames': True,
+            'progress_hooks': [ytdl_hook],
         }
 
         try:
+            if progress_callback:
+                progress_callback(0.05, "Connecting to YouTube...")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 video_filename = ydl.prepare_filename(info)
@@ -88,25 +103,31 @@ class VideoDownloader:
                     base, _ = os.path.splitext(video_filename)
                     video_filename = base + '.' + ydl_opts['merge_output_format']
                 
+                if progress_callback:
+                    progress_callback(0.92, "Finalizing audio tracks (16kHz / 44.1kHz)...")
                 return self._process_video(video_filename, info.get('title', 'video'), info.get('description', ''), info.get('id', None))
         except Exception as e:
             print(f"yt-dlp download error: {e}")
             raise
 
-    def import_local(self, filepath):
+    def import_local(self, filepath, progress_callback=None):
         """
-        Copy local file to TEMP_DIR.
+        Copy local file to TEMP_DIR with progress feedback.
         """
         filename = os.path.basename(filepath)
         dest_path = os.path.join(TEMP_DIR, filename)
+        if progress_callback:
+            progress_callback(0.1, f"Importing local file ({filename})...")
         shutil.copy2(filepath, dest_path)
-        return self._process_video(dest_path, os.path.splitext(filename)[0], "", None)
+        return self._process_video(dest_path, os.path.splitext(filename)[0], "", None, progress_callback=progress_callback)
 
-    def _process_video(self, video_path, title, description="", youtube_id=None):
+    def _process_video(self, video_path, title, description="", youtube_id=None, progress_callback=None):
         """
         Extract audio and return file info.
         """
-        audio_paths = self.extract_audio(video_path)
+        audio_paths = self.extract_audio(video_path, progress_callback=progress_callback)
+        if progress_callback:
+            progress_callback(0.95, "Analyzing media duration & metadata...")
         duration = get_exact_duration(video_path)
         
         return {
@@ -119,7 +140,7 @@ class VideoDownloader:
             "youtube_id": youtube_id
         }
 
-    def extract_audio(self, video_path):
+    def extract_audio(self, video_path, progress_callback=None):
         """
         Extract two audio versions:
         - WAV 16kHz mono (for WhisperX)
@@ -130,9 +151,13 @@ class VideoDownloader:
         audio_44k = os.path.join(TEMP_DIR, f"{base_name}_44k.wav")
 
         # Extract 16k mono
+        if progress_callback:
+            progress_callback(0.40, "Extracting audio track for WhisperX (16kHz mono)...")
         convert_sample_rate(video_path, audio_16k, 16000, 1)
         
         # Extract 44.1k stereo
+        if progress_callback:
+            progress_callback(0.75, "Extracting high-fidelity audio track for Demucs (44.1kHz stereo)...")
         convert_sample_rate(video_path, audio_44k, 44100, 2)
 
         return {"audio_16k": audio_16k, "audio_44k": audio_44k}

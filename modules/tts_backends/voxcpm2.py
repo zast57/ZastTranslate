@@ -99,7 +99,7 @@ class VoxCPM2Backend(TTSBackend):
         trimmed = data[:max_samples]
         trim_path = ref_path.replace(".wav", f"__ref30s.wav")
         sf.write(trim_path, trimmed, sr)
-        print(f"VoxCPM 2: reference audio trimmed {duration:.0f}s → {max_seconds:.0f}s → {trim_path}")
+        print(f"VoxCPM 2: reference audio trimmed {duration:.0f}s -> {max_seconds:.0f}s -> {trim_path}")
         self._trimmed_ref_cache[cache_key] = trim_path
         return trim_path
 
