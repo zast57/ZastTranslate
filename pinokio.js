@@ -1,7 +1,7 @@
 module.exports = {
   version: "5.0",
-  title: "ZastTranslate — Beta 1.10",
-  description: "Video translation & dubbing with voice cloning — 100% local, zero API. Supports 30 languages (VoxCPM 2) with per-language CPS calibration, automatic transcription, YouTube SEO Studio, translation, and AI dubbing.",
+  title: "ZastTranslate — Beta 1.18",
+  description: "Video translation & dubbing with voice cloning — 100% local, zero API. Supports 30 languages (VoxCPM 2), YouTube SEO Studio, Viral Shorts Studio (9:16), and WordPress SEO Blog Post Generator.",
   icon: "zastttranslate.png",
   menu: async (kernel, info) => {
     let installed = info.exists("env/installed.sentinel")
@@ -9,7 +9,8 @@ module.exports = {
       install: info.running("install.js"),
       start: info.running("start.js"),
       update: info.running("update.js"),
-      reset: info.running("reset.js")
+      reset: info.running("reset.js"),
+      flux_install: info.running("flux_install.js")
     }
     if (running.install) {
       return [{
@@ -17,6 +18,13 @@ module.exports = {
         icon: "fa-solid fa-plug",
         text: "Installing",
         href: "install.js",
+      }]
+    } else if (running.flux_install) {
+      return [{
+        default: true,
+        icon: "fa-solid fa-wand-magic-sparkles",
+        text: "Installing FLUX",
+        href: "flux_install.js",
       }]
     } else if (installed) {
       if (running.start) {
@@ -60,6 +68,10 @@ module.exports = {
           icon: "fa-solid fa-power-off",
           text: "Start",
           href: "start.js"
+        }, {
+          icon: "fa-solid fa-wand-magic-sparkles",
+          text: "Install FLUX (Optional)",
+          href: "flux_install.js"
         }, {
           icon: "fa-solid fa-sync",
           text: "Update",

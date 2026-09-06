@@ -3,7 +3,7 @@ import torch
 
 # Nom du projet
 APP_NAME = "ZastTranslate"
-APP_VERSION = "1.10"
+APP_VERSION = "1.18"
 
 # Chemins
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

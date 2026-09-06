@@ -41,16 +41,69 @@ def format_timestamp_short(seconds: float) -> str:
         return f"{hours:02d}:{minutes:02d}:{s:02d}"
     return f"{minutes:02d}:{s:02d}"
 
-def clean_youtube_text(text: str) -> str:
-    """Strip markdown bold/italic asterisks so YouTube descriptions remain clean."""
+def clean_youtube_text(text: str, is_fr: bool = True) -> str:
+    """
+    Strip markdown bold/italic asterisks, clean quotes, and apply Humanizer Anti-AI Cleanup
+    (Charte WikiProject AI Cleanup 35 patterns & blader/humanizer).
+    """
     if not text:
         return ""
+    # Remove thinking tags or chatter
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE).strip()
+    text = re.sub(r'<think>.*', '', text, flags=re.DOTALL | re.IGNORECASE).strip()
+    text = text.replace('<think>', '').replace('</think>', '').strip()
+    
     # Remove **bold** and *italic* markdown artifacts
     cleaned = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
     cleaned = re.sub(r"\*([^*]+)\*", r"\1", cleaned)
     # Remove leading/trailing quotes
     cleaned = cleaned.strip().strip('"\'')
-    return cleaned
+    
+    # Apply Humanizer anti-cliché cleanup from Tab 7 blog_generator
+    try:
+        from modules.blog_generator import blog_generator
+        if blog_generator and hasattr(blog_generator, "clean_ai_artifacts"):
+            cleaned = blog_generator.clean_ai_artifacts(cleaned, is_fr=is_fr)
+    except Exception:
+        pass
+
+    # YouTube video-specific AI chatter patterns
+    if is_fr:
+        yt_cliches_fr = [
+            (r"\bDans cette vidéo,?\s*(?:nous allons|nous verrons|découvrez|plongeons dans|je vais vous présenter)\b[^.!?\n]*[.!?\n]?", ""),
+            (r"\bBienvenue dans cette vidéo\b[^.!?\n]*[.!?\n]?", ""),
+            (r"\bPlongeons (?:sans plus attendre )?dans (?:le vif du sujet|les détails)[^.!?\n]*[.!?\n]?", ""),
+            (r"\bSans plus attendre,?\s*", ""),
+            (r"\bVoyons sans plus tarder,?\s*", ""),
+            (r"\bUn véritable couteau suisse\b", "Un outil polyvalent"),
+            (r"\b(?:une|cette) solution révolutionnaire\b", "une solution performante"),
+            (r"\brévolutionnaire\b", "performant"),
+            (r"\bun outil incontournable\b", "un outil adapté"),
+            (r"\bdes performances époustouflantes\b", "de bonnes performances"),
+            (r"\bÀ l'ère (?:du numérique|de l'intelligence artificielle|de la transformation digitale)[^,\n]*,?", ""),
+            (r"\bDans un monde (?:en constante évolution|de plus en plus connecté|numérique)[^,\n]*,?", ""),
+            (r"\bDans le paysage (?:actuel|technologique|numérique)[^,\n]*,?", ""),
+        ]
+        for pat, rep in yt_cliches_fr:
+            cleaned = re.sub(pat, rep, cleaned, flags=re.IGNORECASE)
+    else:
+        yt_cliches_en = [
+            (r"\bIn this video,?\s*(?:we will|we'll|let's|I am going to)\s*(?:explore|dive into|discover|show you)\b[^.!?\n]*[.!?\n]?", ""),
+            (r"\bWelcome to this video\b[^.!?\n]*[.!?\n]?", ""),
+            (r"\bLet's dive (?:right )?into[^.!?\n]*[.!?\n]?", ""),
+            (r"\bWithout further ado,?\s*", ""),
+            (r"\bA game changer\b", "An effective solution"),
+            (r"\bgroundbreaking\b", "notable"),
+            (r"\bbreathtaking\b", "impressive"),
+            (r"\bIn (?:today's )?(?:fast-paced )?digital (?:world|age|landscape)[^,\n]*,?", ""),
+        ]
+        for pat, rep in yt_cliches_en:
+            cleaned = re.sub(pat, rep, cleaned, flags=re.IGNORECASE)
+
+    # Double space / multi-newline cleanup
+    cleaned = re.sub(r' +', ' ', cleaned)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    return cleaned.strip()
 
 def format_youtube_title(title: str, is_fr: bool = True) -> str:
     """Format and polish YouTube titles: capital first letter, proper punctuation and spacing."""
@@ -85,17 +138,6 @@ def format_youtube_title(title: str, is_fr: bool = True) -> str:
     for pat, rep in brand_map.items():
         t = re.sub(pat, rep, t, flags=re.IGNORECASE)
         
-    # If title looks like a raw lowercase dump of keywords (e.g. "Tuto hermes agent installation windows guide complet"),
-    # format into a clean high-CTR French title
-    if is_fr and len(t.split()) >= 4 and ":" not in t and " - " not in t and " | " not in t:
-        if t.lower().startswith("tuto ") or t.lower().startswith("tutoriel "):
-            if "installation" in t.lower() and "windows" in t.lower():
-                subject = "Hermès Agent" if "herm" in t.lower() else "l'outil"
-                t = f"Tutoriel {subject} : Installation et guide complet sur Windows"
-            elif "guide" in t.lower():
-                subject = "Hermès Agent" if "herm" in t.lower() else "l'outil"
-                t = f"Tutoriel {subject} : Guide pas à pas complet"
-                
     return t
 
 class YouTubeSEOAssistant:
@@ -353,28 +395,28 @@ Optimized YouTube Chapters:"""
         clean_keys = [re.sub(r'[^a-zA-Z0-9À-ÖØ-öø-ÿ]', '', k) for k in (keywords or []) if k]
         clean_keys = [k for k in clean_keys if len(k) >= 3]
         
-        main_tag = f"#{re.sub(r'[^a-zA-Z0-9]', '', main_topic)}" if main_topic else "#Tech"
+        main_tag = f"#{re.sub(r'[^a-zA-Z0-9]', '', main_topic).lower()}" if main_topic else ("#ia" if is_fr else "#ai")
         is_fr = str(lang).lower().startswith("fr")
         
         # Primary subject tags
-        p1 = [main_tag] + [f"#{k}" for k in clean_keys[:4]]
+        p1 = [main_tag] + [f"#{k.lower()}" for k in clean_keys[:4]]
         if len(p1) < 4:
-            p1 += ["#IA", "#Tech", "#OpenSource"] if is_fr else ["#AI", "#Tech", "#OpenSource"]
+            p1 += ["#ia", "#doublage", "#clonagevocal", "#pinokio"] if is_fr else ["#ai", "#dubbing", "#voicecloning", "#pinokio"]
             
         # Format / Intent tags
-        p2_tags = [main_tag] + (["#Tutoriel", "#GuideComplet", "#Installation", "#Avis", "#Test"] if is_fr else ["#Tutorial", "#Guide", "#Setup", "#Review", "#HandsOn"])
+        p2_tags = [main_tag] + (["#tutoriel", "#guide", "#tuto", "#test"] if is_fr else ["#tutorial", "#guide", "#setup", "#review"])
         
         # Ecosystem & Technology tags
-        p3_tags = [main_tag] + (["#IntelligenceArtificielle", "#Tech", "#ChatGPT", "#Productivite", "#Software"] if is_fr else ["#ArtificialIntelligence", "#Tech", "#ChatGPT", "#Productivity", "#Software"])
+        p3_tags = [main_tag] + (["#ia", "#clonagevocal", "#doublage", "#pinokio"] if is_fr else ["#ai", "#voicecloning", "#dubbing", "#pinokio"])
         
         # Trends & Community tags
-        p4_tags = [main_tag] + (["#Innovation", "#Dev", "#Tendance", "#Automation", "#Digital"] if is_fr else ["#Innovation", "#Dev", "#Trending", "#Automation", "#Digital"])
+        p4_tags = [main_tag] + (["#opensource", "#whisper", "#innovation", "#dev"] if is_fr else ["#opensource", "#whisper", "#innovation", "#dev"])
 
         return {
-            "Pack 1: Subject & Specific": " ".join(list(dict.fromkeys(p1))[:6]),
-            "Pack 2: Review & Unboxing": " ".join(list(dict.fromkeys(p2_tags))[:6]),
-            "Pack 3: Collector & Tech": " ".join(list(dict.fromkeys(p3_tags))[:6]),
-            "Pack 4: Community & Trends": " ".join(list(dict.fromkeys(p4_tags))[:6])
+            "Pack 1: Subject & Specific": " ".join(list(dict.fromkeys(p1))[:4]),
+            "Pack 2: Review & Unboxing": " ".join(list(dict.fromkeys(p2_tags))[:4]),
+            "Pack 3: Collector & Tech": " ".join(list(dict.fromkeys(p3_tags))[:4]),
+            "Pack 4: Community & Trends": " ".join(list(dict.fromkeys(p4_tags))[:4])
         }
 
     def generate_full_seo_package(
@@ -449,33 +491,37 @@ Requêtes de recherche réelles (YouTube Suggest) : {', '.join(trends[:8])}
 Transcription intégrale :
 {transcript_sample}
 
-CONSIGNES STRICTES POUR LE TITRE :
-- Structure recommandée selon le sujet : "Guide complet et installation de [Sujet/Outil]" OU "Tutoriel [Sujet/Outil] : Guide pas à pas" OU "Unboxing et test de [Produit]"
-- INTERDICTION des termes faibles comme "Test en direct", "Live test", "Vidéo", ou de crochets inutiles [ ].
-- RÈGLE DE CASSE : Casse naturelle en français (majuscule UNIQUEMENT au premier mot et aux noms propres : Windows, API, Python, etc.). INTERDICTION d'écrire en Title Case anglais avec des majuscules à chaque mot !
-- Maximum 70 caractères, impact fort sur mobile et recherche.
+RÈGLES CAPITALES DE RÉDACTION NATURELLE (ANTI-DÉTECTION IA — CHARTE HUMANIZER & WIKIPROJECT AI CLEANUP) :
+1. ZÉRO BOURSOUFLURE NI HYPE : N'écris JAMAIS 'témoigne de', 'joue un rôle charnière', 'marque un tournant', 'une avancée révolutionnaire', 'un véritable couteau suisse'. Bannis les superlatifs vides ('époustouflant', 'incontournable').
+2. ZÉRO FORMULES D'INTRO/OUTRO ARTIFICIELLES : Bannis formellement 'Plongeons sans plus attendre dans...', 'Dans cette vidéo nous allons explorer...', 'À l'ère du numérique', 'Dans un monde connecté'. L'accroche doit entrer directement dans le vif du sujet sans formule de politesse artificielle.
+3. PAS DE PARTICIPES PRÉSENTS ARTIFICIELS : Évite les incises pompeuses ('permettant ainsi de', 'mettant en lumière', 'illustrant parfaitement').
+4. INTERDICTION FORMELLE D'ASTÉRISQUES MARKDOWN ** : Rédige en texte brut avec des émojis sobres et une casse normale de phrase (PAS DE TITRES EN MAJUSCULES QUI CRIENT).
+5. RYTHME NATUREL HUMAIN (BURSTINESS) : Alterne phrases courtes percutantes et explications techniques directes. Voix active, humaine, ton direct de créateur d'expérience.
 
-CONSIGNES STRICTES POUR LA DESCRIPTION :
-- INTERDICTION FORMELLE d'utiliser des astérisques markdown `**` (YouTube Studio ne gère pas le gras markdown et affiche de vilaines étoiles). Utilise des Emojis et du texte en MAJUSCULES pour les titres de rubriques (ex: 📦 PRÉSENTATION DU SUJET : ou ⚡ ÉTAPES & FONCTIONNALITÉS :).
-- Rédige une description complète, riche et humaine d'environ 250 à 350 mots.
-- Les 150 premiers caractères (l'accroche) doivent résumer immédiatement le sujet et donner envie de cliquer.
+CONSIGNES POUR LE TITRE :
+- INTENTION DE RECHERCHE FORTE : Place les mots-clés exacts recherchés par les spectateurs dès les 45 premiers caractères (ex: "Comment doubler une vidéo avec sa voix...", "Traduire et doubler ses vidéos YouTube...", "Comment cloner sa voix pour...").
+- BANNIS LES PRÉFIXES PARASITES qui mangent l'espace sur smartphone (pas de "TUTO :", pas de "Guide :", pas de crochets [ ]).
+- RÈGLE DE CASSE : Casse standard française naturelle (majuscule UNIQUEMENT au premier mot et aux noms propres : Windows, API, Python, etc.). INTERDICTION d'écrire en Title Case anglais avec des majuscules à chaque mot !
+- Maximum 70 caractères, direct, percutant et cliquable.
+
+CONSIGNES POUR LA DESCRIPTION (200 à 300 mots sans aucun astérisque) :
 - Structure attendue :
-  1. ACCROCHE : 2 phrases percutantes contenant les mots-clés principaux.
-  2. PRÉSENTATION & FONCTIONNALITÉS : 2 paragraphes détaillant ce qui est présenté et expliqué dans la vidéo.
-  3. CE QUE VOUS ALLEZ DÉCOUVRIR : 4 à 5 tirets simples (- ) sans markdown résumant les points clés.
+  1. ACCROCHE (2 phrases) : Directe, contenant l'intention de recherche et les mots-clés principaux dès les 100 premiers caractères.
+  2. AU PROGRAMME : 5 à 7 tirets simples (- ) sans markdown listant les étapes réelles montrées.
+  3. Des intertitres sobres en minuscules (ex: "Au programme :", "Liens utiles :", "Configuration requise :"). Pas de titres en majuscules criardes.
 
-CONSIGNES STRICTES POUR LES HASHTAGS (4 PACKS DE 5 HASHTAGS PERTINENTS) :
-- Choisis des hashtags YouTube populaires et spécifiques au SUJET RÉEL de la vidéo (ex: #HermesAgent #IA #IntelligenceArtificielle #Tutoriel #OpenSource).
-- N'inclus JAMAIS de verbes conjugués isolés ou de mots parasites (pas de #aviez, #salut, #travaille).
+CONSIGNES POUR LES HASHTAGS (4 PACKS DE 4 HASHTAGS COURTS ET POPULAIRES) :
+- Choisis des hashtags YouTube courts, en minuscules et réellement recherchés (ex: #ia #doublage #clonagevocal #pinokio).
+- N'inclus JAMAIS de verbes conjugués isolés ni de mots parasites (pas de #aviez, #salut, #travaille).
 
 Format de réponse STRICT :
 TITRE: [Titre ici]
 ACCROCHE: [Accroche ici]
 CORPS: [Texte détaillé sans astérisques ici]
-PACK1: [#Hashtag1 #Hashtag2 #Hashtag3 #Hashtag4 #Hashtag5]
-PACK2: [#Hashtag1 #Hashtag2 #Hashtag3 #Hashtag4 #Hashtag5]
-PACK3: [#Hashtag1 #Hashtag2 #Hashtag3 #Hashtag4 #Hashtag5]
-PACK4: [#Hashtag1 #Hashtag2 #Hashtag3 #Hashtag4 #Hashtag5]"""
+PACK1: [#tag1 #tag2 #tag3 #tag4]
+PACK2: [#tag1 #tag2 #tag3 #tag4]
+PACK3: [#tag1 #tag2 #tag3 #tag4]
+PACK4: [#tag1 #tag2 #tag3 #tag4]"""
             else:
                 prompt = f"""You are an elite YouTube SEO Strategist and video metadata specialist.
 Analyze the video transcript below and create a professional, high-ranking YouTube publishing kit.
@@ -487,16 +533,19 @@ Live YouTube Search Suggest queries: {', '.join(trends[:8])}
 Transcript:
 {transcript_sample}
 
+CRITICAL HUMANIZER WRITING RULES (ANTI-AI DETECTION — 35 WIKIPEDIA AI CLEANUP PATTERNS):
+1. NO INFLATED CLAIMS OR LEGACY HYPE: Avoid 'pivotal moment', 'testament to', 'crucial role', 'indelible mark', 'game changer', 'revolutionary'.
+2. NO STOCK FORMULAS OR CHATTER: Ban 'In this video we will explore', 'Without further ado', 'Let's dive into', 'In today's fast-paced digital world'. Hook immediately into search intent.
+3. NO SHALLOW -ING PHRASES: Cut pseudo-profound participial clauses ('highlighting the significance', 'showcasing how', 'fostering a sense of').
+4. NO MARKDOWN ASTERISKS ** : Plain text headers with clean emojis.
+5. BURSTINESS & RHYTHM: Alternate punchy short sentences with nuanced direct explanations. Active creator voice.
+
 STRICT TITLE GUIDELINES:
 - Front-load the PRODUCT NAME / TOOL or SEARCH INTENT for maximum mobile search CTR.
-- E.g.: Complete Setup Guide: Hermes AI Agent on Windows
 - Natural sentence casing (capital only on first word and proper names).
-- NEVER use spammy brackets like [Live Test].
 - Max 70 characters.
 
-STRICT DESCRIPTION GUIDELINES:
-- NEVER use markdown asterisks `**` (YouTube Studio does not parse markdown bold and shows ugly asterisks). Use clean plain text headers with emojis (e.g. 📦 OVERVIEW:).
-- Write a rich, high-ranking YouTube description (250-350 words).
+STRICT DESCRIPTION GUIDELINES (250-350 words):
 - First 150 characters must front-load primary search keywords.
 - Structure:
   1. HOOK: 2 compelling sentences with target keywords.
@@ -504,7 +553,7 @@ STRICT DESCRIPTION GUIDELINES:
   3. KEY HIGHLIGHTS: 3-4 simple bullet points (- ) without asterisks.
 
 HASHTAG PACKS (4 PACKS OF 5 RELEVANT HASHTAGS):
-- Generate 5 specific, high-intent hashtags per pack tailored to the video topic. No random isolated filler words.
+- Generate 5 specific, high-intent hashtags per pack tailored to the video topic.
 
 STRICT Output format:
 TITRE: [SEO Title here]
@@ -516,7 +565,7 @@ PACK3: [#Hashtag1 #Hashtag2 #Hashtag3 #Hashtag4 #Hashtag5]
 PACK4: [#Hashtag1 #Hashtag2 #Hashtag3 #Hashtag4 #Hashtag5]"""
 
             messages = [
-                {"role": "system", "content": "You are a professional YouTube SEO specialist. Output strictly the requested sections without any markdown asterisks **."},
+                {"role": "system", "content": "You are a professional YouTube SEO specialist following the Humanizer anti-AI writing charter. Output strictly the requested sections without any markdown asterisks **."},
                 {"role": "user", "content": prompt}
             ]
             
@@ -564,18 +613,18 @@ PACK4: [#Hashtag1 #Hashtag2 #Hashtag3 #Hashtag4 #Hashtag5]"""
 
         default_hashtags = hashtag_packs.get("Pack 1: Subject & Specific", default_hashtags)
 
-        # Ensure description body is 100% free of markdown bold asterisks
-        full_desc_body = clean_youtube_text(full_desc_body)
-        hook_text = clean_youtube_text(hook_text)
+        # Ensure description body, hook, and full description are 100% free of markdown asterisks and AI cliches
+        full_desc_body = clean_youtube_text(full_desc_body, is_fr=is_fr)
+        hook_text = clean_youtube_text(hook_text, is_fr=is_fr)
         optimized_title = format_youtube_title(optimized_title, is_fr=is_fr)
 
         # Assemble Full Structured Description
         links_block = ""
         if domains:
-            header_links = "🔗 LIENS ET RESSOURCES MENTIONNÉS :\n" if is_fr else "🔗 RESOURCES AND LINKS:\n"
+            header_links = "Liens et outils mentionnés :\n" if is_fr else "Resources and links:\n"
             links_block = header_links + "\n".join(f"• https://{d}" for d in domains) + "\n\n"
             
-        ch_header = "⏱️ SOMMAIRE & CHAPITRES :" if is_fr else "⏱️ CHAPTERS & TIMESTAMPS:"
+        ch_header = "Chapitres :" if is_fr else "Chapters:"
         cta_text = (
             "👍 Si la vidéo vous a plu, pensez à laisser un like, partager votre avis en commentaire et vous abonner pour ne manquer aucun tutoriel !"
             if is_fr else
@@ -593,6 +642,7 @@ PACK4: [#Hashtag1 #Hashtag2 #Hashtag3 #Hashtag4 #Hashtag5]"""
             f"{cta_text}\n\n"
             f"{default_hashtags}"
         )
+        full_description = clean_youtube_text(full_description, is_fr=is_fr)
         
         # Build High-Value Long-Tail YouTube Tags
         tags_pool = []

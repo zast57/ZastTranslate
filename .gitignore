@@ -45,6 +45,8 @@ cosyvoice/
 *.mp4
 *.m4a
 *.flac
+*.zip
+blog_images/
 
 # Local / generated files
 ENVIRONMENT

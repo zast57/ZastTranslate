@@ -16,6 +16,18 @@ class Translator:
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_name).to(self.device)
 
+    def translate_text(self, text, source_lang_name, target_lang_name):
+        """
+        Translate a single string using NLLB.
+        """
+        if not text or not str(text).strip():
+            return ""
+        dummy_seg = [{"text": str(text).strip(), "start": 0.0, "end": 1.0}]
+        res = self.translate_segments(dummy_seg, source_lang_name, target_lang_name)
+        if res and len(res) > 0:
+            return res[0].get("translated_text", "")
+        return ""
+
     def translate_segments(self, segments, source_lang_name, target_lang_name):
         """
         Traduit une liste de segments.

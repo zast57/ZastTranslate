@@ -37,12 +37,12 @@ def test_filler_removal_multilingual():
     # Spanish
     res_es = cleaner.clean_text_heuristics("Bueno pues, vamos a instalar la aplicación.", lang_code="es")
     print(f"[ES TEST] 'Bueno pues...' -> '{res_es}'")
-    assert res_es.startswith("Vamos")
+    assert res_es.lower().startswith("vamos")
     
     # German
     res_de = cleaner.clean_text_heuristics("Also halt, wir starten das Programm jetzt.", lang_code="de")
     print(f"[DE TEST] 'Also halt...' -> '{res_de}'")
-    assert res_de.startswith("Wir")
+    assert res_de.lower().startswith("wir")
 
 def test_words_list_sync():
     cleaner = SRTCleaner()

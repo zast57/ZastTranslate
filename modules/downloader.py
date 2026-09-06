@@ -16,10 +16,14 @@ else:
 
 
 def _ydl_base_opts() -> dict:
-    """Common yt-dlp options with automatic JS runtime injection."""
+    """Common yt-dlp options with automatic JS runtime injection and remote challenge solver."""
     opts = {}
     if _JS_RUNTIME:
         opts['js_runtimes'] = {_JS_RUNTIME: {}}
+        opts['remote_components'] = ['ejs:github']
+    ffmpeg = shutil.which('ffmpeg')
+    if ffmpeg:
+        opts['ffmpeg_location'] = ffmpeg
     return opts
 
 
@@ -66,9 +70,11 @@ class VideoDownloader:
         # No container restriction: ffmpeg merges any codec pair into mp4 via merge_output_format
         if resolution == "Best":
             fmt = "bestvideo+bestaudio/best"
+            format_sort = ['res', 'ext:mp4:m4a', 'codec:h264:vp9']
         else:
             height = resolution.replace("p", "")
-            fmt = f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best"
+            fmt = f"bestvideo[height<={height}]+bestaudio/bestvideo+bestaudio/best[height<={height}]/best"
+            format_sort = [f'res:{height}', 'ext:mp4:m4a', 'codec:h264:vp9']
 
         def ytdl_hook(d):
             if progress_callback and d.get('status') == 'downloading':
@@ -85,6 +91,7 @@ class VideoDownloader:
         ydl_opts = {
             **_ydl_base_opts(),
             'format': fmt,
+            'format_sort': format_sort,
             'outtmpl': os.path.join(TEMP_DIR, '%(title)s.%(ext)s'),
             'merge_output_format': 'mp4',
             'noplaylist': True,

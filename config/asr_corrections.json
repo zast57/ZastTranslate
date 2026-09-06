@@ -1,0 +1,1112 @@
+[
+  {
+    "pattern": "\\ble bug mode\\b",
+    "replacement": "Bulk Mode",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\btranslation et domain\\b",
+    "replacement": "Translation et Dubbing",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:l['’]Archev3|large V3|large v3|l['’]arche v3)\\b",
+    "replacement": "large-v3",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bmoteur\\s+de\\s+large[- ]v3\\b",
+    "replacement": "modèle large-v3",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:QN\\s*3\\.5(?:[\\s\\.\\-]*9B)?|Qwen\\s*3\\.5(?:[\\s\\.\\-]*9B)?)\\b",
+    "replacement": "Qwen3.5-9B",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bQuen\\b",
+    "replacement": "Qwen",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bFluxchnell\\b|\\bFlux\\s*schnell\\b",
+    "replacement": "FLUX.1-schnell",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bFitid\\b",
+    "replacement": "Fitted",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bVOXCPM\\s*2\\b|\\bVoxCPM2\\b|\\bvoxCPM2\\b|\\bvox\\s*cpm\\s*2\\b",
+    "replacement": "VoxCPM 2",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bBlogStudio\\b",
+    "replacement": "Blog Studio",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bClean Filler\\b",
+    "replacement": "Clean Fillers",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b16\\s+neuvi[èe]mes?\\b|\\b16/9[èe]me\\b",
+    "replacement": "16:9",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b9[-/]16[èe]me\\b|\\b9\\s+seizi[èe]mes?\\b",
+    "replacement": "9:16",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bles\\s+longs?\\s+cha[îi]nes\\b",
+    "replacement": "les longues traînes",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bles\\s+tics?[- ]IA\\b",
+    "replacement": "les tics IA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:le\\s+)?m[êe]me\\s+auto\\b",
+    "replacement": "le mode auto",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:cliqu[ée]\\s+sur\\s+)?un\\s+transcript\\b",
+    "replacement": "Run Transcription",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bhashtags\\s+tags\\b",
+    "replacement": "hashtags",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bContinue\\s+to\\s+doing\\s+an\\s+export\\b",
+    "replacement": "Continue to Dubbing & Export",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bAssemble,\\s*Final,?\\s*Vid[eé]o\\s+et\\s+Audio\\b",
+    "replacement": "Assemble Final Video & Audio",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bG[eé]n[eé]rate\\s+SEO,?\\s*Blog\\s+Article\\s+et\\s+WordPress\\s+Kit\\b",
+    "replacement": "Generate SEO Blog Article & WordPress Kit",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bde\\s+prompte\\b",
+    "replacement": "de prompt",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Co\\s*coro|Coco\\s*ro|Koko\\s*ro)\\b",
+    "replacement": "Kokoro",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Cozy\\s*voice|Cosy\\s*voice)\\b",
+    "replacement": "CosyVoice",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bF[- ]?5\\s*TTS\\b",
+    "replacement": "F5-TTS",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bChat\\s*TTS\\b|\\bchatte\\s*TTS\\b",
+    "replacement": "ChatTTS",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bX[- ]?TTS(?:[- ]v2)?\\b",
+    "replacement": "XTTS-v2",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bFish\\s*speech\\b",
+    "replacement": "Fish Speech",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bEdge[- ]TTS\\b",
+    "replacement": "Edge-TTS",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bMelo\\s*TTS\\b",
+    "replacement": "MeloTTS",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bVoice\\s*Craft\\b",
+    "replacement": "VoiceCraft",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bfast(?:er)?[- ]whisper\\b",
+    "replacement": "faster-whisper",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bWhisper\\s*X\\b",
+    "replacement": "WhisperX",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:D[eé]mux|D[eé]mucs)\\b",
+    "replacement": "Demucs",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bPyanote\\b",
+    "replacement": "pyannote",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bPySceneDetect\\b|\\bpie\\s*scene\\s*detect\\b",
+    "replacement": "PySceneDetect",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bvoice\\s*cleaning\\b|\\bvoice\\s*glowing\\b",
+    "replacement": "voice cloning",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\btext\\s+to\\s+speech\\b",
+    "replacement": "Text-to-Speech",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bspeech\\s+to\\s+text\\b",
+    "replacement": "Speech-to-Text",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bDeep\\s*seek\\b|\\bDip\\s*sik\\b",
+    "replacement": "DeepSeek",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bDeepSeek[- ]R\\s*1\\b|\\bDip\\s*sik\\s*R1\\b",
+    "replacement": "DeepSeek-R1",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bDeepSeek[- ]V\\s*3\\b",
+    "replacement": "DeepSeek-V3",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Au\\s*lama|O\\s*lama|eau\\s*lama)\\b",
+    "replacement": "Ollama",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bVLLM\\b|\\bvLLM\\b",
+    "replacement": "vLLM",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bLlama\\s*3(?:\\.[123])?\\b|\\bLama\\s*3(?:\\.[123])?\\b",
+    "replacement": "Llama 3",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:llama|lama)\\s*cpp\\b|\\bllama\\s*c\\s*\\+\\+\\b",
+    "replacement": "llama.cpp",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bExLlama(?:V2)?\\b|\\bEx\\s*llama\\b",
+    "replacement": "ExLlamaV2",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bMix\\s*tral\\b",
+    "replacement": "Mixtral",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bMistral\\s*NeMo\\b",
+    "replacement": "Mistral NeMo",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Djemma|Jemma)\\b",
+    "replacement": "Gemma",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bPhi[- ]?4\\b|\\bFi[- ]?4\\b",
+    "replacement": "Phi-4",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bPhi[- ]?3\\b|\\bFi[- ]?3\\b",
+    "replacement": "Phi-3",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bClaude\\s*3\\.5\\s*Sonnet\\b|\\bCloud\\s*3\\.5\\s*Sonnet\\b",
+    "replacement": "Claude 3.5 Sonnet",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bClaude\\s*3\\.7\\s*Sonnet\\b|\\bCloud\\s*3\\.7\\s*Sonnet\\b",
+    "replacement": "Claude 3.7 Sonnet",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:CloudEye|Cloud\\s*Eye|Cloud\\s*A\\s*I|Cloude\\s*AI|Cloud\\s*ai)\\b",
+    "replacement": "Claude.ai",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bClaude\\s*dot\\s*ai\\b",
+    "replacement": "Claude.ai",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bChat\\s+GPT\\b",
+    "replacement": "ChatGPT",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bOpen\\s+AI\\b",
+    "replacement": "OpenAI",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bGPT[- ]?4o\\b|\\bGPT\\s*4\\s*o\\b",
+    "replacement": "GPT-4o",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bGPT[- ]?4\\.5\\b",
+    "replacement": "GPT-4.5",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bMid\\s+journey\\b",
+    "replacement": "Midjourney",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bStable\\s+Diffusion\\b",
+    "replacement": "Stable Diffusion",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bFLUX\\.1[- ]dev\\b|\\bFlux\\s*dev\\b",
+    "replacement": "FLUX.1-dev",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bSDXL\\b|\\bSD\\s*XL\\b",
+    "replacement": "SDXL",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bSD\\s*1\\.5\\b|\\bSD\\s*un\\s*point\\s*cinq\\b",
+    "replacement": "SD 1.5",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Wan\\s*2\\.1|One\\s*2\\.1|Wann\\s*2\\.1)\\b",
+    "replacement": "Wan2.1",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:HunyuanVideo|Hunyuan\\s*video|Ouan\\s*yuan\\s*vid[eé]o)\\b",
+    "replacement": "HunyuanVideo",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bCogVideoX\\b|\\bCoq\\s*vid[eé]o\\s*X\\b",
+    "replacement": "CogVideoX",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bLTX[- ]Video\\b|\\bL\\s*TX\\s*vid[eé]o\\b",
+    "replacement": "LTX-Video",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bAnimate\\s*Diff\\b",
+    "replacement": "AnimateDiff",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bControl\\s*Net\\b",
+    "replacement": "ControlNet",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bPinocchio\\b",
+    "replacement": "Pinokio",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bComfy\\s*UI\\b",
+    "replacement": "ComfyUI",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bTensor\\s*RT\\b",
+    "replacement": "TensorRT",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bFlash\\s*Attention\\b",
+    "replacement": "FlashAttention",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bsafe\\s*tensors\\b",
+    "replacement": "safetensors",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bopen\\s*sauce\\b",
+    "replacement": "open source",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bfind\\s*tuning\\b",
+    "replacement": "fine-tuning",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bzero\\s*short\\b|\\b0\\s*shot\\b",
+    "replacement": "zero-shot",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bfew\\s*short\\b",
+    "replacement": "few-shot",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bbeat\\s*rate\\b(?=\\s*(?:of|is|in|audio|video|\\d))",
+    "replacement": "bitrate",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bcheck\\s*points\\b(?=\\s*(?:model|fichier|weights))",
+    "replacement": "checkpoints",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bG\\s*GUF\\b|\\bgee\\s*guff\\b",
+    "replacement": "GGUF",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bEXL\\s*2\\b|\\bX\\s*L\\s*2\\b",
+    "replacement": "EXL2",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bAWQ\\b|\\bA\\s*W\\s*Q\\b",
+    "replacement": "AWQ",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bNF\\s*4\\b",
+    "replacement": "NF4",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bFP\\s*16\\b|\\bfloat\\s*16\\b",
+    "replacement": "FP16",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bBF\\s*16\\b|\\bbfloat\\s*16\\b",
+    "replacement": "BF16",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bTF\\s*32\\b",
+    "replacement": "TF32",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Hugging\\s*face|HuggingFace)\\b",
+    "replacement": "Hugging Face",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bGit\\s*Hub\\b",
+    "replacement": "GitHub",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Pie[- ]?torch|pie[- ]?torche|Paille[- ]?torche|pytorch)\\b",
+    "replacement": "PyTorch",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Tensor[- ]?flow|tensseur[- ]?flow|tensorflow)\\b",
+    "replacement": "TensorFlow",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:laura|l'aura)\\b(?=\\s*(?:weights?|mod[eè]les?|adapters?|fichiers?|files?|train|fine[- ]tune))",
+    "replacement": "LoRA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\blora\\b(?=\\s*(?:weights?|mod[eè]les?|adapters?|fichiers?|files?|train|fine[- ]tune|checkpoint))",
+    "replacement": "LoRA",
+    "case_sensitive": true
+  },
+  {
+    "pattern": "\\b(?:SG[- ]?lang|sglang)\\b",
+    "replacement": "SGLang",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:diffusers|Diffusers)\\b(?=\\s*(?:pipeline|library|bibliothèque|python|hugging\\s*face|from))",
+    "replacement": "Diffusers",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:transformers|Transformers)\\b(?=\\s*(?:pipeline|library|bibliothèque|python|hugging\\s*face|from))",
+    "replacement": "Transformers",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Anthropique|anthropique)\\b(?=\\s*(?:AI|IA|Claude|Sonnet|Opus|Haiku|modèle|model))",
+    "replacement": "Anthropic",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Perplexité|perplexité)\\b(?=\\s*(?:AI|IA|moteur|recherche|search|app))",
+    "replacement": "Perplexity",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bPerplexity\\s*AI\\b",
+    "replacement": "Perplexity AI",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Dj[eé]mini|Jiminy)\\b(?=\\s*(?:1\\.5|2\\.0|2\\.5|Flash|Pro|Ultra|Google|AI|IA|modèle|model))",
+    "replacement": "Gemini",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bGemini\\s*1\\.5\\s*Flash\\b",
+    "replacement": "Gemini 1.5 Flash",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bGemini\\s*1\\.5\\s*Pro\\b",
+    "replacement": "Gemini 1.5 Pro",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bGemini\\s*2\\.0\\s*Flash\\b",
+    "replacement": "Gemini 2.0 Flash",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bo1[- ]preview\\b",
+    "replacement": "o1-preview",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bo1[- ]mini\\b",
+    "replacement": "o1-mini",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bo3[- ]mini\\b",
+    "replacement": "o3-mini",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bGPT[- ]?4[- ]?(?:turbo|Turbo)\\b",
+    "replacement": "GPT-4 Turbo",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bClaude\\s*3\\s*Opus\\b",
+    "replacement": "Claude 3 Opus",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bClaude\\s*3\\.5\\s*Haiku\\b",
+    "replacement": "Claude 3.5 Haiku",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bMistral\\s*AI\\b|\\bmistral\\s*ai\\b",
+    "replacement": "Mistral AI",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bCodestral\\b|\\bCode\\s*stral\\b",
+    "replacement": "Codestral",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bPixtral\\b|\\bPix\\s*tral\\b",
+    "replacement": "Pixtral",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bMistral\\s*Large\\b",
+    "replacement": "Mistral Large",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bMistral\\s*Small\\b",
+    "replacement": "Mistral Small",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bQwen\\s*2\\.5[- ]Coder\\b",
+    "replacement": "Qwen2.5-Coder",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bQwen\\s*2\\.5\\b",
+    "replacement": "Qwen 2.5",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:DALL[- ]?E\\s*3|Dall[- ]?e\\s*3|Dal[- ]?e\\s*3)\\b",
+    "replacement": "DALL-E 3",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:DALL[- ]?E|Dall[- ]?e|Dal[- ]?e)(?!\\s*3)\\b",
+    "replacement": "DALL-E",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bSora\\b(?=\\s*(?:AI|IA|OpenAI|vid[eé]o|video|mod[eè]le|model))",
+    "replacement": "Sora",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Eleven\\s*Labs|11\\s*labs|elevenlabs)\\b",
+    "replacement": "ElevenLabs",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Tortoise[- ]?TTS|tortoise\\s*tts)\\b",
+    "replacement": "Tortoise-TTS",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bCartesia\\s*Sonic\\b",
+    "replacement": "Cartesia Sonic",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Play[- ]?HT|Play\\s*H\\s*T|playht)\\b",
+    "replacement": "PlayHT",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Suno\\s*Bark|Bark\\s*TTS)\\b",
+    "replacement": "Bark",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bSuno\\b(?=\\s*(?:AI|IA|musique|music|v3|v3\\.5|v4))",
+    "replacement": "Suno",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bUdio\\b(?=\\s*(?:AI|IA|musique|music|v1|v1\\.5))",
+    "replacement": "Udio",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bR\\s*V\\s*C(?:[- ]v2)?\\b",
+    "replacement": "RVC",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Aplio|applio)\\b",
+    "replacement": "Applio",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Ultimate\\s*Vocal\\s*Remover|UVR\\s*5|U\\s*V\\s*R\\s*5)\\b",
+    "replacement": "UVR5",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:large[- ]v3[- ]turbo|large\\s*V3\\s*turbo|whisper[- ]turbo)\\b",
+    "replacement": "large-v3-turbo",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:distil[- ]whisper|Distil[- ]Whisper)\\b",
+    "replacement": "distil-whisper",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bdia\\s*risation\\b",
+    "replacement": "diarisation",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bdia\\s*rization\\b",
+    "replacement": "diarization",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bRunway\\s*(?:Gen[- ]?3(?:[- ]?Alpha)?)\\b",
+    "replacement": "Runway Gen-3",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bRunway\\s*Gen[- ]?2\\b",
+    "replacement": "Runway Gen-2",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Luma\\s*Dream\\s*Machine|Dream\\s*Machine\\s*de\\s*Luma)\\b",
+    "replacement": "Luma Dream Machine",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Kling|Cling)\\s*(?:AI|IA|1\\.5)?\\b(?=\\s*(?:video|vid[eé]o|mod[eè]le|model|g[eé]n[eé]rat))",
+    "replacement": "Kling AI",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Hailuo\\s*AI|Hailuo\\s*video|MiniMax\\s*video)\\b",
+    "replacement": "Hailuo AI",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bPika\\s*(?:Labs|2\\.0|1\\.0)\\b",
+    "replacement": "Pika",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Civit\\s*AI|Civitai|Civit\\s*ai|sivite\\s*a[ïi]|civit\\s*a[ïi])\\b",
+    "replacement": "Civitai",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Automatic\\s*1111|A\\s*1111)\\b",
+    "replacement": "Automatic1111",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Invoke\\s*AI|InvokeAI)\\b",
+    "replacement": "InvokeAI",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Forge\\s*WebUI|SD[- ]?Forge)\\b",
+    "replacement": "Forge WebUI",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Real[- ]?ESRGAN|real\\s*esrgan)\\b",
+    "replacement": "Real-ESRGAN",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:V[- ]?RAM|v[- ]?ram|v[eé]ram|vie[- ]?ram)\\b",
+    "replacement": "VRAM",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Kouda|Quda)\\b",
+    "replacement": "CUDA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bcuda\\b(?=\\s*(?:cores?|drivers?|version|11|12|device|memory|toolkit))",
+    "replacement": "CUDA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:cuDNN|cudnn|cu[- ]?DNN)\\b",
+    "replacement": "cuDNN",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:ROCm|rocm|Rock[- ]?M)\\b",
+    "replacement": "ROCm",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bRTX\\s*4090\\b",
+    "replacement": "RTX 4090",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bRTX\\s*3090\\b",
+    "replacement": "RTX 3090",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bRTX\\s*4080\\b",
+    "replacement": "RTX 4080",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bRTX\\s*5090\\b",
+    "replacement": "RTX 5090",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Flash\\s*Attention\\s*2|FlashAttention[- ]?2)\\b",
+    "replacement": "FlashAttention-2",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:xFormers|xformers|X[- ]?Formers)\\b",
+    "replacement": "xFormers",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:bitsandbytes|BitsAndBytes|bits\\s*and\\s*bytes)\\b",
+    "replacement": "bitsandbytes",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b4[- ]?bits?\\b(?=\\s*(?:quantization|quant|mod[eè]le|weights|fichier))",
+    "replacement": "4-bit",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b8[- ]?bits?\\b(?=\\s*(?:quantization|quant|mod[eè]le|weights|fichier))",
+    "replacement": "8-bit",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:FF[- ]?mpeg|F[- ]?F[- ]?mpeg|f[- ]?mpeg|F[- ]?F[- ]?M[- ]?P[- ]?E[- ]?G)\\b",
+    "replacement": "FFmpeg",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Grad[eé]o|gradio)\\b(?=\\s*(?:interface|app|server|ui|python|block|blocks))",
+    "replacement": "Gradio",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Stream[- ]?lit|stream[- ]?lit|streamlit)\\b",
+    "replacement": "Streamlit",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Fast[- ]?API|fast[- ]?api|fastapi)\\b",
+    "replacement": "FastAPI",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:docker[- ]compose|Docker[- ]compose)\\b",
+    "replacement": "docker-compose",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bGit\\s*Lab\\b",
+    "replacement": "GitLab",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bS[- ]?R[- ]?T\\b",
+    "replacement": "SRT",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bV[- ]?T[- ]?T\\b",
+    "replacement": "VTT",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bS[- ]?B[- ]?V\\b",
+    "replacement": "SBV",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bH[- ]?264\\b|\\bh264\\b|\\bx264\\b",
+    "replacement": "H.264",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bH[- ]?265\\b|\\bh265\\b|\\bx265\\b",
+    "replacement": "H.265",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bProRes\\b|\\bpro[- ]?res\\b",
+    "replacement": "ProRes",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bFPS\\b|\\bfps\\b(?=\\s*(?:rate|audio|video|60|30|24))",
+    "replacement": "FPS",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b60\\s*fps\\b",
+    "replacement": "60 FPS",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b30\\s*fps\\b",
+    "replacement": "30 FPS",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b24\\s*fps\\b",
+    "replacement": "24 FPS",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bR[- ]?A[- ]?G\\b(?=\\s*(?:pipeline|system|syst[eè]me|architecture|mod[eè]le|search))",
+    "replacement": "RAG",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Chain[- ]of[- ]Thought|chain\\s+of\\s+thought)\\b",
+    "replacement": "Chain-of-Thought",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bprompt\\s*engineering\\b",
+    "replacement": "prompt engineering",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bsystem\\s*prompt\\b",
+    "replacement": "system prompt",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bcontext\\s*window\\b",
+    "replacement": "context window",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bground[- ]?truth\\b",
+    "replacement": "ground truth",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bclosed\\s*sauce\\b",
+    "replacement": "closed source",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:lip[- ]sync|lipsync|lip\\s*synchronisation)\\b",
+    "replacement": "lip-sync",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:face[- ]swap|faceswap)\\b",
+    "replacement": "face swap",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\btime\\s*codes?\\b",
+    "replacement": "timecode",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bvector\\s*database\\b|\\bvectordb\\b",
+    "replacement": "vector database",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:ChromaDB|chroma\\s*db)\\b",
+    "replacement": "ChromaDB",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:Pinecone|pine\\s*cone)\\b(?=\\s*(?:db|database|vector))",
+    "replacement": "Pinecone",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:LangChain|lang\\s*chain)\\b",
+    "replacement": "LangChain",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:LlamaIndex|llama\\s*index)\\b",
+    "replacement": "LlamaIndex",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bWeb[- ]?UI\\b|\\bweb[- ]?ui\\b",
+    "replacement": "WebUI",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bsample\\s*rate\\b",
+    "replacement": "samplerate",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b48\\s*k(?:ilo)?h(?:ert)?z\\b",
+    "replacement": "48 kHz",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b44\\.1\\s*k(?:ilo)?h(?:ert)?z\\b",
+    "replacement": "44.1 kHz",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bdata\\s*set\\b",
+    "replacement": "dataset",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bS[- ]?O[- ]?T[- ]?A\\b(?=\\s*(?:model|modèle|performance|results?))",
+    "replacement": "SOTA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bun\\s+(?:laura|l'aura)\\b",
+    "replacement": "un LoRA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\ble\\s+(?:laura|l'aura)\\b",
+    "replacement": "le LoRA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bdes\\s+(?:laura|l'aura)s?\\b",
+    "replacement": "des LoRAs",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bce\\s+(?:laura|l'aura)\\b",
+    "replacement": "ce LoRA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\ba\\s+(?:laura|l'aura)\\b",
+    "replacement": "a LoRA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bthe\\s+(?:laura|l'aura)\\b",
+    "replacement": "the LoRA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:laura|l'aura)\\s+weights?\\b",
+    "replacement": "LoRA weights",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:laura|l'aura)\\s+adapters?\\b",
+    "replacement": "LoRA adapter",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bmod[eè]les?\\s+(?:laura|l'aura)\\b",
+    "replacement": "modèle LoRA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bmodel\\s+(?:laura|l'aura)\\b",
+    "replacement": "model LoRA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\btrain(?:ing)?\\s+(?:a\\s+)?(?:laura|l'aura)\\b",
+    "replacement": "train a LoRA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bentra[îi]ner\\s+(?:un\\s+)?(?:laura|l'aura)\\b",
+    "replacement": "entraîner un LoRA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\ble\\s+sota\\b",
+    "replacement": "le SOTA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bthe\\s+sota\\b",
+    "replacement": "the SOTA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bS[- ]?O[- ]?T[- ]?A\\b",
+    "replacement": "SOTA",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bpipeline\\s+rag\\b",
+    "replacement": "pipeline RAG",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bsyst[eè]me\\s+rag\\b",
+    "replacement": "système RAG",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bsystem\\s+rag\\b",
+    "replacement": "system RAG",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bun\\s+rag\\b",
+    "replacement": "un RAG",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\ba\\s+rag\\b",
+    "replacement": "a RAG",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\bR[- ]?A[- ]?G\\b",
+    "replacement": "RAG",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\ben\\s+4\\s*bits?\\b",
+    "replacement": "en 4-bit",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\ben\\s+8\\s*bits?\\b",
+    "replacement": "en 8-bit",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:in|into)\\s+4\\s*bits?\\b",
+    "replacement": "in 4-bit",
+    "case_sensitive": false
+  },
+  {
+    "pattern": "\\b(?:in|into)\\s+8\\s*bits?\\b",
+    "replacement": "in 8-bit",
+    "case_sensitive": false
+  }
+]

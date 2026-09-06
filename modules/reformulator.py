@@ -506,6 +506,30 @@ Shortened ({target_chars} chars max):"""
             result = re.sub(r"\*([^*]+)\*", r"\1", result).strip()
         return result if result else ""
 
+    def fit_segments(self, segments, cps=CHARS_PER_SECOND, target_lang=None, progress=None):
+        """
+        Fit translated segments to speech timing constraints.
+        Returns (segments, reformulated_count).
+        """
+        if not segments:
+            return segments, 0
+        reformulated_count = 0
+        lang_code = target_lang or "en"
+        for seg in segments:
+            text = seg.get("translated_text", "")
+            duration = seg.get("end", 0) - seg.get("start", 0)
+            max_chars = int(duration * cps * 1.25)
+            if len(text) > max_chars * 1.1 and text.strip():
+                try:
+                    shortened = self.shorten(text, max_chars, lang_code)
+                    if shortened and len(shortened) < len(text):
+                        seg["translated_text"] = shortened
+                        seg["reformulated"] = True
+                        reformulated_count += 1
+                except Exception:
+                    pass
+        return segments, reformulated_count
+
     def cleanup(self):
         if self.llm is not None:
             self.llm.unload()

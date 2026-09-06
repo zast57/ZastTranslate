@@ -141,9 +141,8 @@ class VoxCPM2Backend(TTSBackend):
                 sf.write(default_wav, wav, sr)
                 print(f"VoxCPM 2: Saved default voice to {default_wav}")
             
-            final_ref = default_wav
-            
-        print(f"VoxCPM 2 generate: modified_text='{modified_text}', lang={language}, ref={final_ref}")
+        safe_preview = modified_text[:60].encode('ascii', 'replace').decode('ascii')
+        print(f"VoxCPM 2 generate: text='{safe_preview}', lang={language}, ref={final_ref}")
         
         # Generate speech — normalize=False to avoid Chinese text normalizer mangling English
         # inference_timesteps=10: default VoxCPM2 value, best DiT quality.

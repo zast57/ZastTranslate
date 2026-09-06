@@ -37,7 +37,9 @@ module.exports = {
                 path: ".",
                 env: {
                     "PYTHONDONTWRITEBYTECODE": "1",
-                    "PYTHONUNBUFFERED": "1"
+                    "PYTHONUNBUFFERED": "1",
+                    "PYTHONIOENCODING": "utf-8",
+                    "PYTHONUTF8": "1"
                 },
                 message: [
                     "python app.py",

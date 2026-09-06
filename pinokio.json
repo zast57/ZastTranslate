@@ -1,5 +1,5 @@
 {
-    "title": "ZastTranslate — Beta 1.10",
-    "description": "Video translation & dubbing with voice cloning — 100% local, zero API. Supports 30 languages (VoxCPM 2) with per-language CPS calibration, automatic transcription, YouTube SEO Studio, translation, and AI dubbing.",
+    "title": "ZastTranslate — Beta 1.18",
+    "description": "Video translation & dubbing with voice cloning — 100% local, zero API. Supports 30 languages (VoxCPM 2), YouTube SEO Studio, Viral Shorts Studio (9:16), and WordPress SEO Blog Post Generator.",
     "icon": "zastttranslate.png"
 }
