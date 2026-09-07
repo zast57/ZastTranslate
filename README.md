@@ -2,11 +2,11 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 1.18
+# ZastTranslate — Beta 1.19
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ℹ️ **Beta 1.18**: **WhisperX & SRT Subtitle Pipeline Overhaul** (zero 1-word orphan cues, non-overlapping 40ms timecode normalization, context-aware inter-cue casing with multilingual support, empty cue removal & duration redistribution, 222-rule cross-cue ASR tech dictionary, and decoder prompt priming), **1080p / 2K Video Keyframe Extraction & Text/Code Sharpening (Tab 7 Blog Studio)** with Lanczos high-fidelity scaling, Google Discover compliance (>1200px), YouTube 1080p stream decryption (`ejs:github` JS solver), **YouTube SEO & Description Studio (Original Video Optimization & Humanizer Anti-AI Engine)**, unified dark card UI across Tabs 1 to 5, sticky left preview player, interactive tooltips, and next-step workflow transitions. Tested on **Windows only**.
+> ℹ️ **Beta 1.19**: **Translation & Fitted Pipeline Acceleration (Zero Loss)**: Eliminates redundant subtitle fitting passes, GPU batched reformulation (`shorten_batch`), intelligent VRAM monitoring and safety alerts for 8 GB GPUs (preventing Windows Shared GPU Memory paging slowdowns), and VRAM collision shielding between LLM and TTS backends during dubbing. Tested on **Windows only**.
 
 Translate any video into 33 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -453,6 +453,13 @@ These messages appear in the terminal but **do not affect functionality** and ca
 MIT
 
 ## History
+
+- **Beta 1.19**
+  - **⚡ Translation & Fitted Pipeline Acceleration (Zero Quality Loss)**:
+    - **Eliminated Redundant 3rd Pass**: Removed the duplicate `fit_segments` execution in `step4_translate`, eliminating hundreds of redundant LLM re-analyses on segments already shortened in Phase 2.
+    - **GPU Batched Reformulation (`shorten_batch`)**: Upgraded Phase 2 from sequential 1-by-1 processing to GPU-batched inference (batch size = 8) matching Phase 1, speeding up sentence shortening by 3x to 4x while preserving the exact same prompts and quality.
+    - **Smart VRAM Monitoring & Safety Alert**: Added detection for GPUs with $\le$ 8 GB VRAM (e.g. RTX 4060 Mobile / Desktop 8GB) when selecting `Qwen3.5-9B`. Warns users with actionable guidance to prevent severe Windows Shared GPU Memory paging slowdowns.
+    - **VRAM Collision Shielding during TTS Dubbing**: Hardened `time_sync.py` to prevent reloading heavy LLM models into VRAM while VoxCPM 2 is active on constrained 8 GB GPUs, ensuring audio synthesis maintains natural speeds without system freezes.
 
 - **Beta 1.18**
   - **🎙️ Complete WhisperX & SRT Subtitle Pipeline Overhaul (4 Critical Bug Fixes)**:

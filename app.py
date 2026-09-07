@@ -314,6 +314,23 @@ youtube_publisher = YouTubePublisher(BASE_DIR)
 _user_cps_overrides: dict = load_user_cps()
 
 
+def check_vram_warning(selected_backend: str) -> str:
+    """Warn user if selecting a heavy model (e.g. Qwen3.5-9B) on a GPU with <= 8.5 GB VRAM."""
+    if GPU_VRAM_GB > 0 and GPU_VRAM_GB <= 8.5 and selected_backend == "Qwen3.5-9B":
+        return (
+            "⚠️ Attention (GPU ≤ 8 Go VRAM détecté) : Le modèle Qwen 3.5-9B est volumineux (~6.5 Go). "
+            "Sur Windows, les calculs risquent de déborder dans la mémoire RAM partagée (Shared GPU Memory), "
+            "ce qui peut ralentir la traduction par un facteur de 10x à 20x. "
+            "Si vous constatez des lenteurs extrêmes, nous vous recommandons Qwen2.5-7B."
+        )
+    return ""
+
+
+_startup_vram_warn = check_vram_warning(current_llm_backend)
+if _startup_vram_warn:
+    print(f"\n{_startup_vram_warn}\n")
+
+
 def _build_cps_dataframe():
     """Build the CPS config DataFrame shown in the Config tab."""
     rows = []
@@ -935,27 +952,33 @@ def step4_translate(target_lang, original_title="", original_desc="", progress=g
     state.translated_segments = translated
     
     # PHASE 2: LLM reformulation for segments STILL too long (safety net)
-    progress(0.4, "Phase 2/3: Reformulating remaining long segments...")
+    progress(0.4, "Phase 2/2: Reformulating remaining long segments...")
     reformulated_count = 0
-    for seg in state.translated_segments:
+
+    # Identify segments that still exceed timing
+    long_segments_info = []
+    for idx, seg in enumerate(state.translated_segments):
         text = seg.get("translated_text", "")
         duration = seg["end"] - seg["start"]
         max_chars = int(duration * cps * speed_factor)
-        
         if len(text) > max_chars * 1.1 and text.strip():
-            try:
-                shortened = reformulator.shorten(text, max_chars, target_lang_code)
-                if shortened and len(shortened) < len(text):
-                    seg["translated_text"] = shortened
-                    seg["reformulated"] = True
-                    reformulated_count += 1
-                    print(f"  Reformulated [{seg['start']:.1f}-{seg['end']:.1f}]: {len(text)}→{len(shortened)} chars")
-            except Exception as e:
-                print(f"  Reformulation failed [{seg['start']:.1f}-{seg['end']:.1f}]: {e}")
-    
+            long_segments_info.append((idx, text, max_chars, seg))
+
+    if long_segments_info:
+        print(f"Reformulating {len(long_segments_info)} overflowing segments using GPU-batched inference...")
+        items_to_shorten = [(text, max_chars) for _, text, max_chars, _ in long_segments_info]
+        shortened_results = reformulator.shorten_batch(items_to_shorten, target_lang_code, batch_size=8)
+
+        for (_, text, _, seg), shortened in zip(long_segments_info, shortened_results):
+            if shortened and len(shortened) < len(text):
+                seg["translated_text"] = shortened
+                seg["reformulated"] = True
+                reformulated_count += 1
+                print(f"  Reformulated [{seg['start']:.1f}-{seg['end']:.1f}]: {len(text)}→{len(shortened)} chars")
+
     if reformulated_count > 0:
         print(f"Reformulated {reformulated_count} segments to fit timing")
-    
+
     if original_title.strip():
         try:
             translated_title = reformulator.translate_text(original_title, source_lang, target_lang_code)
@@ -978,11 +1001,7 @@ def step4_translate(target_lang, original_title="", original_desc="", progress=g
     state.video_info['translated_title'] = translated_title
     state.video_info['translated_description'] = translated_desc
 
-    # Fit subtitles using reformulator (LLM or heuristic)
-    progress(0.5, "Fitting translations to speech timing...")
-    state.translated_segments, reformulated_count = reformulator.fit_segments(
-        state.translated_segments, cps, target_lang=target_lang_code, progress=progress
-    )
+    progress(0.7, "Checking subtitle timings and generating preview...")
 
     # Build Dataframe with 5 columns: Start, End, Original, Translation (normal), Fitted
     data = []
@@ -1625,19 +1644,22 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         )
         
         progress(base_progress + prog_step * 0.5, f"[{target_lang}] Reformulating long segments...")
-        for seg in translated:
+        long_segments_info = []
+        for idx, seg in enumerate(translated):
             text = seg.get("translated_text", "")
             duration = seg["end"] - seg["start"]
             max_chars = int(duration * cps * speed_factor)
-            
             if len(text) > max_chars * 1.1 and text.strip():
-                try:
-                    shortened = reformulator.shorten(text, max_chars, target_lang_code)
-                    if shortened and len(shortened) < len(text):
-                        seg["translated_text"] = shortened
-                        seg["reformulated"] = True
-                except Exception as e:
-                    print(f"Reformulation failed for {target_lang}: {e}")
+                long_segments_info.append((idx, text, max_chars, seg))
+
+        if long_segments_info:
+            print(f"[{target_lang}] Reformulating {len(long_segments_info)} overflowing segments using GPU batch...")
+            items_to_shorten = [(text, max_chars) for _, text, max_chars, _ in long_segments_info]
+            shortened_results = reformulator.shorten_batch(items_to_shorten, target_lang_code, batch_size=8)
+            for (_, text, _, seg), shortened in zip(long_segments_info, shortened_results):
+                if shortened and len(shortened) < len(text):
+                    seg["translated_text"] = shortened
+                    seg["reformulated"] = True
                     
         progress(base_progress + prog_step * 0.8, f"[{target_lang}] Natural full translation...")
         reformulator.translate_normal(translated, source_lang, target_lang_code)
@@ -5151,6 +5173,9 @@ with gr.Blocks(title="ZastTranslate", theme=gr.themes.Soft(primary_hue="indigo",
                     reformulator.llm = None
                 reformulator.backend_name = selected_backend
                 print(f"[LLM] Switched active LLM backend to {selected_backend}")
+            warn_msg = check_vram_warning(selected_backend)
+            if warn_msg:
+                gr.Warning(warn_msg)
 
     llm_backend_dropdown.change(on_llm_backend_change, inputs=[llm_backend_dropdown], outputs=[])
 
@@ -5835,7 +5860,16 @@ with gr.Blocks(title="ZastTranslate", theme=gr.themes.Soft(primary_hue="indigo",
         save_config(user_config)
         
         # Switch backend for reformulator
-        reformulator.backend_name = current_llm_backend
+        if reformulator.backend_name != current_llm_backend:
+            if reformulator.llm is not None:
+                reformulator.llm.unload()
+                reformulator.llm = None
+            reformulator.backend_name = current_llm_backend
+            print(f"[LLM] Switched active LLM backend to {current_llm_backend}")
+        
+        warn_msg = check_vram_warning(selected_name)
+        if warn_msg:
+            gr.Warning(warn_msg)
         
         return update_language_dropdowns()
         

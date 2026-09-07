@@ -461,6 +461,101 @@ Shortened ({target_chars} chars max):"""
         
         return result
 
+    def shorten_batch(self, items: list, language: str, batch_size: int = 8) -> list:
+        """
+        Batched version of shorten() for processing multiple overflowing segments in parallel.
+        items: list of (text, target_chars) tuples
+        Returns: list of shortened strings (or None for segments where shortening failed)
+        Uses exact same prompts and validation rules as shorten().
+        """
+        if not items:
+            return []
+
+        self.load_model()
+        lang_name = self._language_name(language)
+
+        if lang_name == "French":
+            examples = (
+                'Exemple: "Maintenant, essayons de le tester." → "Essayons de le tester."\n'
+                'Exemple: "Nous allons mettre en place notre application." → "On met en place l\'appli."\n'
+                'Exemple: "Merci d\'avoir regardé jusqu\'à la fin." → "Merci d\'avoir regardé."\n'
+            )
+        elif lang_name == "English":
+            examples = (
+                'Example: "Now let\'s test it out and see." → "Let\'s test it out."\n'
+                'Example: "We\'ll set up our app and player." → "We set up the app and player."\n'
+            )
+        else:
+            examples = ""
+
+        all_results = []
+
+        for b_start in range(0, len(items), batch_size):
+            sub_items = items[b_start:b_start + batch_size]
+            batch_messages = []
+            batch_max_tokens = []
+            valid_sub_indices = []
+
+            for i, (text, target_chars) in enumerate(sub_items):
+                if not text or len(text.strip()) < 3:
+                    continue
+
+                prompt = f"""Shorten this {lang_name} sentence to {target_chars} characters or fewer.
+
+Rules:
+- Output ONLY the shortened sentence in {lang_name}
+- Must be grammatically correct and natural
+- Keep the same meaning
+- Remove fillers, use shorter forms ("nous allons" → "on")
+- Do NOT translate to another language
+
+{examples}Sentence ({len(text)} chars): {text}
+Shortened ({target_chars} chars max):"""
+
+                messages = [
+                    {"role": "system", "content": f"You shorten {lang_name} sentences. Remove filler words. Keep meaning. Output ONLY the result."},
+                    {"role": "user", "content": prompt}
+                ]
+                batch_messages.append(messages)
+                batch_max_tokens.append(min(80, max(15, len(text))))
+                valid_sub_indices.append(i)
+
+            sub_results = [None] * len(sub_items)
+
+            if batch_messages:
+                if hasattr(self.llm, "generate_batch"):
+                    raw_responses = self.llm.generate_batch(
+                        batch_messages, batch_max_tokens,
+                        do_sample=True, temperature=0.3, repetition_penalty=1.05
+                    )
+                else:
+                    raw_responses = [
+                        self._generate(m, max_new_tokens=t)
+                        for m, t in zip(batch_messages, batch_max_tokens)
+                    ]
+
+                for raw, sub_idx in zip(raw_responses, valid_sub_indices):
+                    text, target_chars = sub_items[sub_idx]
+                    result = self._clean_response(raw)
+
+                    # Exact same validation as shorten()
+                    is_valid = (
+                        result
+                        and len(result) >= 3
+                        and len(result) < len(text)
+                        and len(result) <= target_chars * 1.3
+                    )
+
+                    if not is_valid:
+                        # Fallback to single-item retry
+                        result = self.shorten(text, target_chars, language)
+
+                    sub_results[sub_idx] = result if (result and len(result) < len(text)) else None
+
+            all_results.extend(sub_results)
+
+        return all_results
+
     def check_timing_batch(self, segments, language_family="default"):
         """Estimate and flag segments that are too long."""
         cps = CHARS_PER_SECOND.get(language_family, 13)

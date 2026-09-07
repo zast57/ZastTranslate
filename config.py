@@ -3,7 +3,7 @@ import torch
 
 # Nom du projet
 APP_NAME = "ZastTranslate"
-APP_VERSION = "1.18"
+APP_VERSION = "1.19"
 
 # Chemins
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -20,10 +20,12 @@ for d in [TEMP_DIR, OUTPUT_DIR, MODELS_DIR, VOICES_DIR]:
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 try:
     GPU_NAME = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None"
-    GPU_VRAM = f"{torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB" if torch.cuda.is_available() else "N/A"
+    GPU_VRAM_GB = float(torch.cuda.get_device_properties(0).total_memory / 1024**3) if torch.cuda.is_available() else 0.0
+    GPU_VRAM = f"{GPU_VRAM_GB:.1f} GB" if torch.cuda.is_available() else "N/A"
 except Exception:
     GPU_NAME = "Unknown"
     GPU_VRAM = "N/A"
+    GPU_VRAM_GB = 0.0
 
 # NVIDIA Ampere+ (RTX 30xx/40xx) Acceleration
 if DEVICE == "cuda":
