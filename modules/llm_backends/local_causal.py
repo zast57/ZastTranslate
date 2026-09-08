@@ -87,12 +87,14 @@ class LocalCausalLMBackend(LLMBackend):
         # Set pad_token_id explicitly to suppress transformers warning
         if self.model.generation_config.pad_token_id is None:
             self.model.generation_config.pad_token_id = self.tokenizer.eos_token_id
+        do_sample = kwargs.get("do_sample", False)
         gen_kwargs = {
             "max_new_tokens": max_new_tokens,
-            "do_sample": kwargs.get("do_sample", False),
-            "temperature": kwargs.get("temperature", 0.0),
+            "do_sample": do_sample,
             "repetition_penalty": kwargs.get("repetition_penalty", 1.0)
         }
+        if do_sample:
+            gen_kwargs["temperature"] = kwargs.get("temperature", 0.7)
 
         with torch.no_grad():
             generated_ids = self.model.generate(
@@ -130,12 +132,14 @@ class LocalCausalLMBackend(LLMBackend):
         model_inputs = self.tokenizer(texts, return_tensors="pt", padding=True).to(self.device)
         padded_len = model_inputs.input_ids.shape[1]
 
+        do_sample = kwargs.get("do_sample", False)
         gen_kwargs = {
             "max_new_tokens": max(max_new_tokens_list),
-            "do_sample": kwargs.get("do_sample", False),
-            "temperature": kwargs.get("temperature", 0.0),
+            "do_sample": do_sample,
             "repetition_penalty": kwargs.get("repetition_penalty", 1.0),
         }
+        if do_sample:
+            gen_kwargs["temperature"] = kwargs.get("temperature", 0.7)
 
         with torch.no_grad():
             generated_ids = self.model.generate(**model_inputs, **gen_kwargs)

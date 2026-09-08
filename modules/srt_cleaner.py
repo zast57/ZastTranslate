@@ -523,14 +523,16 @@ Cleaned text:"""
     def split_into_ergonomic_cues(self, segments: List[Dict[str, Any]], text_key: str = "text") -> List[Dict[str, Any]]:
         """
         Split or re-group subtitle segments into standard TV/YouTube ergonomic cues:
-        - Max ~40 chars per line
-        - Max 2 lines per cue
-        - Preserves exact WhisperX word audio timestamps without inventing duration (Bug 1 & 2)
+        - Never sever complete sentences or clauses mid-phrase.
+        - Wrap text into 1 or 2 balanced lines per cue (preserving sentence integrity).
+        - Preserves exact WhisperX word audio timestamps without inventing duration.
         """
         if not segments:
             return []
 
         cues = []
+        strong_puncts = ('.', '?', '!', ';', '…')
+
         for seg in segments:
             raw_text = seg.get(text_key, "").strip()
             start = float(seg.get("start", 0.0))
@@ -544,8 +546,9 @@ Cleaned text:"""
             if not words:
                 continue
 
-            # If segment is short enough, wrap lines directly preserving real audio timing
-            if len(raw_text) <= self.max_chars_per_line * self.max_lines_per_cue:
+            # If segment is under 130 chars, format into balanced lines in a SINGLE cue.
+            # Never sever sentences or clauses into artificial fragments.
+            if len(raw_text) <= 130 or duration <= 8.0:
                 formatted_lines = self._wrap_lines(raw_text)
                 cues.append({
                     "start": start,
@@ -555,56 +558,89 @@ Cleaned text:"""
                 })
                 continue
 
-            # Segment is long: split into multiple balanced sub-cues
-            sub_chunks = self._chunk_words(words, max_chars=self.max_chars_per_line * self.max_lines_per_cue)
-            total_chars = sum(len(c) for c in sub_chunks)
-            curr_start = start
+            # Only split if text is very long (> 130 chars AND > 8s) AND has a strong punctuation boundary (. ? ! ; …)
+            split_idx = -1
+            for idx, w in enumerate(words[:-2]):
+                if any(w.endswith(p) for p in strong_puncts) and idx >= 4 and (len(words) - idx) >= 4:
+                    split_idx = idx
+                    break
 
-            for idx, chunk in enumerate(sub_chunks):
-                chunk_len = len(chunk)
-                ratio = chunk_len / max(1, total_chars)
-                chunk_duration = duration * ratio
-                curr_end = curr_start + chunk_duration
+            if split_idx >= 0:
+                chunk1_words = words[:split_idx + 1]
+                chunk2_words = words[split_idx + 1:]
+                chunk1_text = " ".join(chunk1_words)
+                chunk2_text = " ".join(chunk2_words)
+                ratio = len(chunk1_text) / max(1, len(chunk1_text) + len(chunk2_text))
+                mid_time = round(start + duration * ratio, 3)
 
-                if idx == len(sub_chunks) - 1:
-                    curr_end = end  # snap to segment end
-
-                formatted_lines = self._wrap_lines(chunk)
                 cues.append({
-                    "start": curr_start,
-                    "end": curr_end,
+                    "start": start,
+                    "end": mid_time,
+                    "text": "\n".join(self._wrap_lines(chunk1_text)),
+                    "lines": self._wrap_lines(chunk1_text)
+                })
+                cues.append({
+                    "start": mid_time,
+                    "end": end,
+                    "text": "\n".join(self._wrap_lines(chunk2_text)),
+                    "lines": self._wrap_lines(chunk2_text)
+                })
+            else:
+                # Keep whole sentence as 1 cue with 2 or 3 lines
+                formatted_lines = self._wrap_lines(raw_text)
+                cues.append({
+                    "start": start,
+                    "end": end,
                     "text": "\n".join(formatted_lines),
                     "lines": formatted_lines
                 })
-                curr_start = curr_end
 
         return cues
 
-    def _wrap_lines(self, text: str) -> List[str]:
-        """Wrap text into 1 or 2 balanced lines under max_chars_per_line."""
+    def _wrap_lines(self, text: str, max_chars_per_line: int = 50) -> List[str]:
+        """Wrap text into 1 or 2 (or 3 for very long sentences) balanced lines under max_chars_per_line."""
         text = text.strip()
-        if len(text) <= self.max_chars_per_line:
+        if len(text) <= max_chars_per_line:
             return [text]
 
         words = text.split()
         if len(words) <= 1:
             return [text]
 
-        mid = len(text) // 2
-        best_split = len(words) // 2
-        min_diff = float("inf")
-        curr_len = 0
+        if len(text) <= max_chars_per_line * 2 + 20:
+            mid = len(text) // 2
+            best_split = len(words) // 2
+            min_diff = float("inf")
+            curr_len = 0
 
-        for i, w in enumerate(words[:-1]):
-            curr_len += len(w) + 1
-            diff = abs(curr_len - mid)
-            if diff < min_diff:
-                min_diff = diff
-                best_split = i + 1
+            for i, w in enumerate(words[:-1]):
+                curr_len += len(w) + 1
+                diff = abs(curr_len - mid)
+                if diff < min_diff:
+                    min_diff = diff
+                    best_split = i + 1
 
-        line1 = " ".join(words[:best_split])
-        line2 = " ".join(words[best_split:])
-        return [line1, line2]
+            line1 = " ".join(words[:best_split])
+            line2 = " ".join(words[best_split:])
+            return [line1, line2]
+        else:
+            # 3 lines
+            n_lines = 3
+            target_len = len(text) // n_lines
+            lines = []
+            curr_line = []
+            curr_len = 0
+            for w in words:
+                if curr_line and curr_len + len(w) + 1 > target_len and len(lines) < n_lines - 1:
+                    lines.append(" ".join(curr_line))
+                    curr_line = [w]
+                    curr_len = len(w)
+                else:
+                    curr_line.append(w)
+                    curr_len += len(w) + (1 if len(curr_line) > 1 else 0)
+            if curr_line:
+                lines.append(" ".join(curr_line))
+            return lines
 
     def _chunk_words(self, words: List[str], max_chars: int) -> List[str]:
         """Group words into chunks not exceeding max_chars, breaking on punctuation when possible."""

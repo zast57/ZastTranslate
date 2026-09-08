@@ -54,6 +54,35 @@ module.exports = {
                 message: "uv pip install \"voxcpm>=2.0.2\""
             }
         },
+        // 4. Install llama-cpp-python for high-speed C++ GGUF inference & KV Cache
+        {
+            when: "{{platform === 'win32'}}",
+            method: "shell.run",
+            params: {
+                venv: "env",
+                path: ".",
+                env: {
+                    "UV_SYSTEM_CERTS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
+                message: "uv pip install https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.4-cu124/llama_cpp_python-0.3.4-cp310-cp310-win_amd64.whl || uv pip install llama-cpp-python"
+            }
+        },
+        {
+            when: "{{platform !== 'win32'}}",
+            method: "shell.run",
+            params: {
+                venv: "env",
+                path: ".",
+                env: {
+                    "UV_SYSTEM_CERTS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
+                message: "uv pip install llama-cpp-python"
+            }
+        },
         // 6. Try installing flash-attn (optional, speeds up TTS inference)
         {
             when: "{{platform !== 'win32'}}",
@@ -88,7 +117,8 @@ module.exports = {
                     "python check_env.py",
                     "python -c \"import torch; print('torch', torch.__version__, 'CUDA' if torch.cuda.is_available() else 'CPU')\"",
                     "python -c \"import voxcpm; print('VoxCPM 2 OK')\"",
-                    "python -c \"import bitsandbytes; print('bitsandbytes', bitsandbytes.__version__, 'OK')\""
+                    "python -c \"import bitsandbytes; print('bitsandbytes', bitsandbytes.__version__, 'OK')\"",
+                    "python -c \"import llama_cpp; print('llama_cpp', llama_cpp.__version__, 'OK')\""
                 ]
             }
         },

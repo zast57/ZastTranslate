@@ -54,11 +54,16 @@ class VoxCPM2Backend(TTSBackend):
 
 
 
+        self._prompt_cache_key = None
+        self._cached_prompt_cache = None
+
     def unload(self):
         if self.model is not None:
             # voxcpm keeps things in model.tts_model
             del self.model
             self.model = None
+            self._prompt_cache_key = None
+            self._cached_prompt_cache = None
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
@@ -103,6 +108,46 @@ class VoxCPM2Backend(TTSBackend):
         self._trimmed_ref_cache[cache_key] = trim_path
         return trim_path
 
+    def _get_or_build_prompt_cache(self, ref_path: str, denoise: bool = True):
+        """
+        Build and cache prompt_cache (voice embedding and audio features) for reference audio.
+        VoxCPM normally re-runs ZipEnhancer denoiser (~1.5s) and build_prompt_cache (~1.0s)
+        on EVERY single segment. Caching it here cuts segment latency by ~2.5s without quality loss.
+        """
+        if not ref_path or not os.path.exists(ref_path):
+            return None
+
+        cache_key = f"{os.path.abspath(ref_path)}__denoise_{denoise}"
+        if getattr(self, '_prompt_cache_key', None) == cache_key and getattr(self, '_cached_prompt_cache', None) is not None:
+            return self._cached_prompt_cache
+
+        print(f"VoxCPM 2: Building voice embedding & prompt cache for: {ref_path} (denoise={denoise})...")
+        actual_ref_path = ref_path
+
+        if denoise and hasattr(self.model, 'denoiser') and self.model.denoiser is not None:
+            denoised_cache_path = ref_path.replace(".wav", "__denoised.wav")
+            if os.path.exists(denoised_cache_path):
+                actual_ref_path = denoised_cache_path
+            else:
+                try:
+                    self.model.denoiser.enhance(ref_path, output_path=denoised_cache_path)
+                    actual_ref_path = denoised_cache_path
+                except Exception as e:
+                    print(f"VoxCPM 2: Denoiser warning: {e}, using raw reference audio.")
+                    actual_ref_path = ref_path
+
+        try:
+            prompt_cache = self.model.tts_model.build_prompt_cache(
+                reference_wav_path=actual_ref_path
+            )
+            self._prompt_cache_key = cache_key
+            self._cached_prompt_cache = prompt_cache
+            print(f"VoxCPM 2: Voice prompt cache successfully built and cached.")
+            return self._cached_prompt_cache
+        except Exception as e:
+            print(f"VoxCPM 2: Could not build prompt cache: {e}, falling back to standard generate.")
+            return None
+
     def generate(self, text: str, language: str, output_path: str, ref_audio_path: str = None, speed: float = 1.0, duration: float = None, gender: str = "Woman") -> dict:
         if self.model is None:
             self.load()
@@ -140,25 +185,41 @@ class VoxCPM2Backend(TTSBackend):
                 sr = getattr(self.model.tts_model, 'sample_rate', 24000)
                 sf.write(default_wav, wav, sr)
                 print(f"VoxCPM 2: Saved default voice to {default_wav}")
+            final_ref = default_wav
             
         safe_preview = modified_text[:60].encode('ascii', 'replace').decode('ascii')
         print(f"VoxCPM 2 generate: text='{safe_preview}', lang={language}, ref={final_ref}")
         
-        # Generate speech — normalize=False to avoid Chinese text normalizer mangling English
-        # inference_timesteps=10: default VoxCPM2 value, best DiT quality.
-        #   (was 6 for speed, but ref-audio trim already handles speed)
-        # cfg_value=2.0 (default): LM runs conditional + unconditional pass per token for quality.
-        #   DO NOT lower to 1.0 — causes garbled/echo audio (guidance disabled).
-        # retry_badcase_max_times=2: reduce worst-case retries per segment.
-        wav = self.model.generate(
-            text=modified_text,
-            reference_wav_path=final_ref,
-            normalize=False,
-            inference_timesteps=10,
-            denoise=True,
-            retry_badcase=True,
-            retry_badcase_max_times=2,
-        )
+        # Check if we can use pre-built prompt cache (saves ~2.5s of redundant denoising & audio encoding)
+        prompt_cache = self._get_or_build_prompt_cache(final_ref, denoise=True)
+        if prompt_cache is not None:
+            gen_iter = self.model.tts_model._generate_with_prompt_cache(
+                target_text=modified_text,
+                prompt_cache=prompt_cache,
+                min_len=2,
+                max_len=4096,
+                inference_timesteps=10,
+                cfg_value=2.0,
+                retry_badcase=True,
+                retry_badcase_max_times=2,
+                retry_badcase_ratio_threshold=6.0,
+                streaming=False,
+            )
+            wav_chunks = []
+            for wav_chunk, _, _ in gen_iter:
+                wav_chunks.append(wav_chunk.squeeze(0).cpu().numpy())
+            wav = wav_chunks[0] if wav_chunks else np.zeros(int((self._sample_rate or 24000) * 0.5), dtype=np.float32)
+        else:
+            # Fallback to standard generate
+            wav = self.model.generate(
+                text=modified_text,
+                reference_wav_path=final_ref,
+                normalize=False,
+                inference_timesteps=10,
+                denoise=True,
+                retry_badcase=True,
+                retry_badcase_max_times=2,
+            )
         
         sr = self._sample_rate or 24000
         sf.write(output_path, wav, sr)

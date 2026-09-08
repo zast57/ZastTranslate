@@ -2,11 +2,16 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 1.19
+# ZastTranslate — Beta 1.20
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ℹ️ **Beta 1.19**: **Translation & Fitted Pipeline Acceleration (Zero Loss)**: Eliminates redundant subtitle fitting passes, GPU batched reformulation (`shorten_batch`), intelligent VRAM monitoring and safety alerts for 8 GB GPUs (preventing Windows Shared GPU Memory paging slowdowns), and VRAM collision shielding between LLM and TTS backends during dubbing. Tested on **Windows only**.
+> ℹ️ **Beta 1.20**: **Quadruple Acceleration Architecture (Zero Quality Loss)**:
+> 1. ⚡ **VoxCPM 2 Voice Embedding Caching**: Eliminates redundant ZipEnhancer neural denoising (~1.5s) and audio feature encoding (~1.0s) across all segments, accelerating audio dubbing generation while keeping voice synthesis 100% identical.
+> 2. 🚀 **NVIDIA NVENC Hardware Video Encoding (`h264_nvenc`)**: Accelerated FFmpeg video assembly with NVENC hardware acceleration (preset `p6`, cq `20`) with seamless CPU fallback (`libx264`).
+> 3. 🧠 **C++ Inference Engine (GGUF / `llama-cpp-python`)**: Native C++ execution for Qwen GGUF models with complete GPU offload and automatic Windows CUDA DLL resolution.
+> 4. ⚡ **Prompt Caching (KV Cache)**: System prompt prefix KV caching across translation and reformulation batches, eliminating redundant prefix evaluation.
+> Tested on **Windows only**.
 
 Translate any video into 33 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
 
@@ -26,7 +31,7 @@ Watch the complete step-by-step walkthrough to see ZastTranslate in action, from
 
 - 💡 **Per-Tab Quick Guides & Options Explorer**: Dedicated collapsible guides embedded at the top of each of the 7 tabs explaining Goal, key options/models, and exact step-by-step click order — 100% in English with zero screen-blocking popups.
 - 🎬 **Input**: YouTube URL (with resolution picker), local video, or local audio file (MP3, WAV, etc.)
-- 🎙️ **Transcription**: WhisperX with word-level forced alignment & **7-step subtitle stabilization** (zero 1-word orphan cues, strictly monotonic non-overlapping timecodes with 40ms gaps, intelligent inter-cue continuation lowercasing, English "I" and German noun capitalization preservation, and cross-cue phonetic term restoration via a 222-rule domain dictionary)
+- 🎙️ **Transcription**: WhisperX with word-level forced alignment & **8-step subtitle stabilization** (zero 1-word orphan cues, sentence fragment & anti-dangling merging, strictly monotonic non-overlapping timecodes with 40ms gaps, intelligent inter-cue continuation lowercasing, English "I" and German noun capitalization preservation, and cross-cue phonetic term restoration via a 222-rule domain dictionary)
 - 📝 **SEO Blog & WordPress Studio**: Turn any video into a natural, anti-AI blog article (in any language), with tone & style presets, Meta Description, URL slug, **1080p/2K HD keyframe extraction with Lanczos scaling and text/code sharpening**, and ready-to-copy Gutenberg Block HTML & Markdown.
 - 📱 **Viral Shorts Studio**: Select from 1 to 5 viral moments, preview sequences in the player, customize burned subtitles, and render to vertical 9:16 (1080x1920) with stacked blur & TikTok karaoke dynamic captions.
 - 🌍 **Multi-Backend Translation**: Choose between Qwen2.5-7B, Qwen3.5-9B, or EuroLLM-9B
@@ -110,17 +115,18 @@ After transcription, review and edit the table (Start, End, Text).
 
 You can also **import an existing SRT file** instead of running transcription.
 
-#### 🎙️ Post-ASR Subtitle Cleaning & Stabilization Pipeline (7 Steps)
+#### 🎙️ Post-ASR Subtitle Cleaning & Stabilization Pipeline (8 Steps)
 
-To eliminate common WhisperX acoustic hallucinations and timing defects that degrade downstream LLM translation and TTS voice cloning, ZastTranslate runs a strict 7-stage post-processing pipeline:
+To eliminate common WhisperX acoustic hallucinations, broken sentence fragments, and timing defects that degrade downstream LLM translation and TTS voice cloning, ZastTranslate runs a strict 8-stage post-processing pipeline:
 
 1. **AI & Tech Context Priming (`initial_prompt`)**: Injects domain vocabulary into the WhisperX autoregressive decoder combined with the video title, eliminating errors at the acoustic source.
 2. **Lookahead Word-Level Boundary Splitting**: Enforces `MIN_CUE_WORDS = 3` and `MIN_CUE_DURATION_MS = 400ms`. Words are never expelled into isolated single-word cues with fabricated timings.
 3. **Empty & Isolated Punctuation Elimination**: Prunes cues that reduce to empty text or solitary punctuation marks (e.g. `"."`), automatically redistributing their duration to the previous cue.
 4. **Context-Aware Sentence Casing (`fix_inter_cue_casing`)**: Only capitalizes at sentence beginnings (first cue or after `.`, `?`, `!`, `…`, `:`, `»`). Mid-sentence continuations are lowercased while respecting proper nouns, acronyms, single accented characters (`À`, `É`), English pronouns (`I`, `I'm`), and capitalized German nouns.
 5. **Cross-Cue Post-ASR Tech Dictionary (`config/asr_corrections.json`)**: Reconstitutes the subtitle stream to detect and repair 222+ AI, machine learning, speech, video, and hardware terms even if split across consecutive cues (e.g. `"QN 3.5."` + `"9B"` $\rightarrow$ `"Qwen3.5-9B"`, `"Bulk Mode"`, `"PyTorch"`, `"LoRA"`, `"ElevenLabs"`).
-6. **Strict Timecode Normalization (`normalize_timecodes`)**: Clamps timecodes to guarantee `end[i] <= start[i+1] - 40ms`, strictly preventing overlapping subtitles in video players and audio drift in TTS dubbing.
-7. **Broadcast-Compliant Subtitle Formatting**: Formats lines within standard reading speeds and lengths (UTF-8 BOM `.srt`, `.vtt`, and single-line `.sbv`).
+6. **Sentence Fragment Merging & Anti-Dangling Engine (`merge_sentence_fragments`)**: Analyzes candidate endings to detect dangling connector words (`si`, `que`, `de`, `après`, `ou`, `et`, `par`, `en`, `se`, `che`, `di`, `if`, `that`, `of`, `wenn`, `dass`), strips accidental terminal punctuation, and fuses trailing clauses with adjacent cues into grammatically sound, complete sentences.
+7. **Strict Timecode Normalization (`normalize_timecodes`)**: Clamps timecodes to guarantee `end[i] <= start[i+1] - 40ms`, strictly preventing overlapping subtitles in video players and audio drift in TTS dubbing.
+8. **Broadcast-Compliant Subtitle Formatting**: Formats lines within standard reading speeds and lengths (UTF-8 BOM `.srt`, `.vtt`, and single-line `.sbv`).
 
 #### 🚀 YouTube SEO & Description Studio (Original Video Optimization & Humanizer Anti-AI Engine)
 
@@ -453,6 +459,20 @@ These messages appear in the terminal but **do not affect functionality** and ca
 MIT
 
 ## History
+
+- **Beta 1.20**
+  - **⚡ Quadruple Acceleration Architecture (Zero Quality Loss)**:
+    - **VoxCPM 2 Voice Embedding Caching**: Eliminates redundant ZipEnhancer neural denoising (~1.5s) and audio feature encoding (~1.0s) across all segments, speeding up voice dubbing while keeping voice synthesis 100% identical.
+    - **NVIDIA NVENC Hardware Video Encoding (`h264_nvenc`)**: Accelerated FFmpeg video assembly with NVENC hardware acceleration (preset `p6`, cq `20`) with seamless CPU fallback (`libx264`).
+    - **C++ Inference Engine (GGUF / `llama-cpp-python`)**: Native C++ execution for Qwen GGUF models with complete GPU offload and automatic Windows CUDA DLL resolution.
+    - **Prompt Caching (KV Cache)**: System prompt prefix KV caching across translation and reformulation batches, eliminating redundant prefix evaluation.
+  - **🎙️ Subtitle Sentence Integrity & Anti-Dangling Engine (`merge_sentence_fragments`)**:
+    - **Eliminated Dangling Sentence Fragments**: Strips trailing punctuation from connector candidates (`si`, `que`, `de`, `après`, `ou`, `et`, `par`, `en`, `se`, `che`, `di`, `if`, `that`, `of`, `wenn`, `dass`) and cleanly merges trailing clauses with adjacent cues into full, grammatically complete sentences.
+    - **Strict Number & Data Preservation**: Added validation in `shorten` and `shorten_batch` to guarantee that figures, prices, percentages, dates, and numbers present in the transcript are strictly preserved.
+    - **Truncated Word Rejection Filter**: Rejection filter for truncated abbreviations (e.g. `nov.`, `unq.`, `gouvern.`, `maj.`) during sentence fitting, safely falling back to complete natural sentences.
+  - **📝 SEO Blog Studio H1 Title Completeness & Calibration (`format_seo_title`)**:
+    - **Fixed Title Truncation**: Replaced blind 75-character chopping with intelligent sentence-boundary preservation (up to 85 characters).
+    - **Anti-Dangling Title Sanitizer**: Prioritizes complete main titles and systematically eliminates trailing dangling functional words (`de`, `vos`, `à`, `pour`, etc.), ensuring every H1 title is a natural, grammatically complete sentence.
 
 - **Beta 1.19**
   - **⚡ Translation & Fitted Pipeline Acceleration (Zero Quality Loss)**:

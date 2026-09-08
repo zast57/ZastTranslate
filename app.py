@@ -298,7 +298,12 @@ available_llm_backends = get_available_llm_backends()
 if current_tts_backend not in available_tts_backends:
     current_tts_backend = "VoxCPM 2"
 if current_llm_backend not in available_llm_backends:
-    current_llm_backend = "Qwen3.5-9B"
+    matched = None
+    for k in available_llm_backends:
+        if current_llm_backend.split(' ')[0] in k:
+            matched = k
+            break
+    current_llm_backend = matched or list(available_llm_backends.keys())[0]
 
 tts_engine = get_tts_backend(current_tts_backend)
 # Reformulator will load the LLM internally using its backend_name
@@ -316,12 +321,12 @@ _user_cps_overrides: dict = load_user_cps()
 
 def check_vram_warning(selected_backend: str) -> str:
     """Warn user if selecting a heavy model (e.g. Qwen3.5-9B) on a GPU with <= 8.5 GB VRAM."""
-    if GPU_VRAM_GB > 0 and GPU_VRAM_GB <= 8.5 and selected_backend == "Qwen3.5-9B":
+    if GPU_VRAM_GB > 0 and GPU_VRAM_GB <= 8.5 and ("3.5" in selected_backend or "9B" in selected_backend):
         return (
-            "⚠️ Attention (GPU ≤ 8 Go VRAM détecté) : Le modèle Qwen 3.5-9B est volumineux (~6.5 Go). "
-            "Sur Windows, les calculs risquent de déborder dans la mémoire RAM partagée (Shared GPU Memory), "
-            "ce qui peut ralentir la traduction par un facteur de 10x à 20x. "
-            "Si vous constatez des lenteurs extrêmes, nous vous recommandons Qwen2.5-7B."
+            "⚠️ Notice (GPU ≤ 8 GB VRAM detected): Qwen 3.5-9B is a large model (~6.5 GB). "
+            "On Windows, computations risk spilling into Shared GPU Memory (system RAM), "
+            "which may slow down translation by 10x-20x. "
+            "If you experience extreme slowdowns, we recommend switching to Qwen2.5-7B (Ideal for 8 GB GPUs)."
         )
     return ""
 
@@ -481,7 +486,7 @@ def step1_download(url, local_file, resolution, custom_title="", progress=gr.Pro
 
 def step2_transcribe(lang_source, model_size, progress=gr.Progress()):
     if not state.video_info:
-        return "Error: No video loaded.", None, _get_empty_segments_html(), None
+        return "Error: No video loaded.", None, _get_empty_segments_html(), None, "None"
     
     progress(0.1, "Separating vocals...")
     stems = separator.separate(state.video_info['audio_44k'])
@@ -576,19 +581,19 @@ def step2_transcribe(lang_source, model_size, progress=gr.Progress()):
         print(f"Auto-export transcription SRT error: {e}")
         srt_path = None
     
-    return f"Transcription complete ({len(data)} segments). Subtitles ready to download below. Click 'Validate Transcription' to proceed.", data, _get_segments_json_html(), srt_path
+    return f"Transcription complete ({len(data)} segments). Subtitles ready to download below. Click 'Validate Transcription' to proceed.", data, _get_segments_json_html(), srt_path, "Original"
 
 def step2b_import_srt(srt_file, lang_source):
     """Import an SRT file as transcription."""
     if srt_file is None:
-        return "Error: No SRT file selected.", None, _get_empty_segments_html(), None
+        return "Error: No SRT file selected.", None, _get_empty_segments_html(), None, "None"
     
     file_path = srt_file.name if hasattr(srt_file, "name") else str(srt_file)
     try:
         segments, errors = srt_parser.convert_user_srt_to_segments(file_path)
         
         if not segments:
-            return "Error: No segments found in SRT file.", None, _get_empty_segments_html(), None
+            return "Error: No segments found in SRT file.", None, _get_empty_segments_html(), None, "None"
         
         if state.video_info is None:
             state.video_info = {}
@@ -600,7 +605,24 @@ def step2b_import_srt(srt_file, lang_source):
             "Hindi": "hi", "Dutch": "nl", "Polish": "pl", "Turkish": "tr",
             "Swedish": "sv", "Czech": "cs", "Romanian": "ro", "Hungarian": "hu",
         }
-        state.video_info['detected_language'] = source_lang_map.get(lang_source, "Auto")
+        detected = source_lang_map.get(lang_source, "Auto")
+        if detected == "Auto":
+            upper_f = file_path.upper()
+            for code, iso in [("fr", "_FR.SRT"), ("en", "_EN.SRT"), ("es", "_ES.SRT"), ("de", "_DE.SRT"), ("it", "_IT.SRT"), ("ja", "_JA.SRT")]:
+                if iso in upper_f or f"_{code}.srt" in file_path.lower():
+                    detected = code
+                    break
+            if detected == "Auto" and segments:
+                import re
+                sample_text = " ".join([s["text"] for s in segments[:15]]).lower()
+                fr_words = {"le", "la", "les", "des", "est", "et", "dans", "pour", "avec", "que", "qui", "pas", "vous", "nous", "sur", "au", "aux", "cartes"}
+                en_words = {"the", "is", "and", "in", "for", "with", "that", "this", "not", "you", "we", "on", "are", "have"}
+                tokens = set(re.findall(r'\b\w+\b', sample_text))
+                if len(tokens & fr_words) > len(tokens & en_words):
+                    detected = "fr"
+                elif len(tokens & en_words) > len(tokens & fr_words):
+                    detected = "en"
+        state.video_info['detected_language'] = detected if detected != "Auto" else "fr"
         
         # Convert to internal format
         state.segments = []
@@ -660,9 +682,9 @@ def step2b_import_srt(srt_file, lang_source):
         except Exception:
             srt_path = None
 
-        return f"SRT imported ({len(data)} segments).{warning} Subtitles ready below. Click 'Validate Transcription'.", data, _get_segments_json_html(), srt_path
+        return f"SRT imported ({len(data)} segments).{warning} Subtitles ready below. Click 'Validate Transcription'.", data, _get_segments_json_html(), srt_path, "Original"
     except Exception as e:
-        return f"Error importing SRT: {str(e)}", None, _get_empty_segments_html(), None
+        return f"Error importing SRT: {str(e)}", None, _get_empty_segments_html(), None, "None"
 
 def step2_clean_transcription(df_data, lang_source, progress=gr.Progress()):
     """Clean oral fillers and polish transcription text in the editor."""
@@ -865,7 +887,9 @@ def step2_apply_seo_metadata(seo_title, seo_desc):
 def _dataframe_to_rows(data):
     """Convert Gradio Dataframe output to list of lists, handling all formats."""
     import pandas as pd
-    if isinstance(data, pd.DataFrame):
+    if hasattr(data, 'data') and not isinstance(data, dict):
+        return data.data
+    elif isinstance(data, pd.DataFrame):
         return data.values.tolist()
     elif isinstance(data, dict) and 'data' in data:
         return data['data']
@@ -908,7 +932,7 @@ def step3_save_transcription(data):
 
 def step4_translate(target_lang, original_title="", original_desc="", progress=gr.Progress()):
     if not state.segments:
-        return "Error: No transcription available.", None, _get_empty_segments_html(), "", "", None
+        return "Error: No transcription available.", None, _get_empty_segments_html(), "", "", None, "None"
 
     # Clear old synced segment audio cache when running a new translation
     import glob
@@ -920,8 +944,19 @@ def step4_translate(target_lang, original_title="", original_desc="", progress=g
 
     progress(0, f"Translating to {target_lang}...")
     
-    # Detect source language from transcription
-    source_lang = state.video_info.get('detected_language', 'en') if state.video_info else 'en'
+    # Detect source language from transcription or segment text
+    source_lang = state.video_info.get('detected_language', '') if state.video_info else ''
+    if not source_lang or source_lang in ["Auto", "auto", "Unknown"]:
+        if state.segments:
+            import re
+            sample_text = " ".join([s["text"] for s in state.segments[:15]]).lower()
+            fr_words = {"le", "la", "les", "des", "est", "et", "dans", "pour", "avec", "que", "qui", "pas", "vous", "nous", "sur", "au", "aux", "cartes"}
+            tokens = set(re.findall(r'\b\w+\b', sample_text))
+            source_lang = "fr" if len(tokens & fr_words) >= 3 else "en"
+        else:
+            source_lang = "fr"
+    if state.video_info:
+        state.video_info['detected_language'] = source_lang
     target_lang_code = LANGUAGES.get(target_lang, target_lang)
     lang_iso = _get_iso_code(target_lang_code).lower()
     cps = get_effective_cps(lang_iso, _user_cps_overrides)
@@ -955,14 +990,17 @@ def step4_translate(target_lang, original_title="", original_desc="", progress=g
     progress(0.4, "Phase 2/2: Reformulating remaining long segments...")
     reformulated_count = 0
 
-    # Identify segments that still exceed timing
+    # Identify segments that still exceed timing (skip in same-language mode to preserve 100% of authentic speech)
     long_segments_info = []
-    for idx, seg in enumerate(state.translated_segments):
-        text = seg.get("translated_text", "")
-        duration = seg["end"] - seg["start"]
-        max_chars = int(duration * cps * speed_factor)
-        if len(text) > max_chars * 1.1 and text.strip():
-            long_segments_info.append((idx, text, max_chars, seg))
+    src_name = reformulator._source_language_name(source_lang)
+    tgt_name = reformulator._language_name(target_lang_code)
+    if src_name != tgt_name:
+        for idx, seg in enumerate(state.translated_segments):
+            text = seg.get("translated_text", "")
+            duration = seg["end"] - seg["start"]
+            max_chars = int(duration * cps * speed_factor)
+            if len(text) > max_chars * 1.1 and text.strip():
+                long_segments_info.append((idx, text, max_chars, seg))
 
     if long_segments_info:
         print(f"Reformulating {len(long_segments_info)} overflowing segments using GPU-batched inference...")
@@ -978,6 +1016,10 @@ def step4_translate(target_lang, original_title="", original_desc="", progress=g
 
     if reformulated_count > 0:
         print(f"Reformulated {reformulated_count} segments to fit timing")
+
+    # PHASE 3: Natural full translation for the 'Translation' column
+    progress(0.6, "Phase 3/3: Natural full translation (unconstrained)...")
+    reformulator.translate_normal(state.translated_segments, source_lang, target_lang_code)
 
     if original_title.strip():
         try:
@@ -1033,10 +1075,16 @@ def step4_translate(target_lang, original_title="", original_desc="", progress=g
     try:
         srt_parser.segments_to_clean_srt(state.translated_segments, srt_path, text_key="translated_text", lang_code=tgt_lang, clean_fillers=False)
         shutil.copy2(srt_path, os.path.join(TEMP_DIR, f"fitted_{iso}.srt"))
-    except Exception:
+        
+        # Also export full natural translation SRT
+        norm_srt_path = os.path.join(OUTPUT_DIR, f"translation_{iso}.srt")
+        srt_parser.segments_to_clean_srt(state.translated_segments, norm_srt_path, text_key="normal_text", lang_code=tgt_lang, clean_fillers=False)
+        shutil.copy2(norm_srt_path, os.path.join(TEMP_DIR, f"translation_{iso}.srt"))
+    except Exception as e:
+        print(f"[EXPORT] Warning saving translation SRTs: {e}")
         srt_path = None
         
-    return status_msg, data, _get_segments_json_html(), translated_title, translated_desc, srt_path
+    return status_msg, data, _get_segments_json_html(), translated_title, translated_desc, srt_path, "Translation (Fitted)"
 
 def step5_save_translation(data, dubbing_text_source="Fitted Translation", translated_title="", translated_desc=""):
     rows = _dataframe_to_rows(data)
@@ -1668,10 +1716,18 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
         trans_srt = os.path.join(TEMP_DIR, f"translation_{iso}.srt")
         srt_parser.segments_to_clean_srt(translated, trans_srt, text_key="normal_text", lang_code=target_lang_code, clean_fillers=False)
         output_files.append(trans_srt)
+        try:
+            shutil.copy2(trans_srt, os.path.join(OUTPUT_DIR, f"translation_{iso}.srt"))
+        except Exception:
+            pass
         
         fitted_srt = os.path.join(TEMP_DIR, f"fitted_{iso}.srt")
         srt_parser.segments_to_clean_srt(translated, fitted_srt, text_key="translated_text", lang_code=target_lang_code, clean_fillers=False)
         output_files.append(fitted_srt)
+        try:
+            shutil.copy2(fitted_srt, os.path.join(OUTPUT_DIR, f"fitted_{iso}.srt"))
+        except Exception:
+            pass
         
         # Store SRT path for YouTube Publishing (We prefer natural translation for subtitles)
         state.bulk_results['srts'][target_lang_code] = trans_srt
@@ -3644,92 +3700,123 @@ BLOCKS_JS = """
         }
 
         if (player) {
-            if (!player.dataset.hasTimeupdate) {
-                player.dataset.hasTimeupdate = "true";
-                debugLog("Found player! Attaching timeupdate event listener. Tag: " + player.tagName);
-                player.addEventListener("timeupdate", () => {
-                    const currentTime = player.currentTime;
-                    
-                    const holder = document.querySelector("#segments_json_holder");
-                    const overlay = document.querySelector("#subtitle_overlay");
-                    
-                    if (!holder || !overlay) {
-                        if (Math.random() < 0.05) {
-                            debugLog("Warning: holder or overlay missing from DOM");
-                        }
-                        return;
+            const updateSubtitles = () => {
+                const currentTime = player.currentTime;
+                
+                const holder = document.querySelector("#segments_json_holder");
+                const overlay = document.querySelector("#subtitle_overlay");
+                
+                // Inject or find on-screen video subtitle element directly over the video player
+                let videoScreenSub = document.querySelector(".zast-video-subtitles");
+                if (!videoScreenSub) {
+                    const vContainer = (player && player.parentElement) ? player.parentElement : document.querySelector("#video_player");
+                    if (vContainer) {
+                        videoScreenSub = document.createElement("div");
+                        videoScreenSub.className = "zast-video-subtitles";
+                        videoScreenSub.style.cssText = "position: absolute; bottom: 45px; left: 4%; right: 4%; text-align: center; color: #fde047; font-size: 1.25em; font-weight: 700; text-shadow: 0 0 4px #000, 2px 2px 4px #000, -2px -2px 4px #000; pointer-events: none; z-index: 25; display: none; line-height: 1.35; background: rgba(0,0,0,0.65); padding: 4px 12px; border-radius: 6px; box-sizing: border-box;";
+                        vContainer.style.position = "relative";
+                        vContainer.appendChild(videoScreenSub);
                     }
-                    
-                    let mode = window.ZastSubtitleMode;
-                    if (!mode) {
-                        const checked = document.querySelector("#subtitle_selection input:checked");
-                        if (checked) {
-                            const val = checked.value;
-                            if (val === "None" || val === "Original" || val === "Translation (Fitted)" || val === "Translation (Normal)") {
-                                mode = val;
-                            } else {
-                                const label = checked.closest("label");
-                                if (label) {
-                                    mode = label.textContent.trim();
-                                } else {
-                                    mode = "None";
-                                }
-                            }
-                        } else {
-                            mode = "None";
+                }
+                
+                if (!holder) return;
+                
+                let mode = null;
+                const checked = document.querySelector("#subtitle_selection input:checked");
+                if (checked) {
+                    const val = checked.value;
+                    if (val === "None" || val === "Original" || val === "Translation (Fitted)" || val === "Translation (Normal)") {
+                        mode = val;
+                    } else {
+                        const label = checked.closest("label");
+                        if (label) {
+                            mode = label.textContent.trim();
                         }
                     }
-                    
-                    if (mode === "None") {
+                }
+                if (!mode) {
+                    mode = window.ZastSubtitleMode || "None";
+                }
+                
+                if (mode === "None") {
+                    if (overlay) {
                         overlay.innerHTML = "";
                         overlay.style.display = "none";
-                        return;
                     }
-                    
-                    const jsonEl = holder.querySelector("#segments_json_data") || holder;
-                    const b64 = jsonEl.textContent.trim();
-                    if (!b64 || b64 === "W10=") {
-                        if (Math.random() < 0.05) {
-                            debugLog("Segments empty or W10= (default empty)");
-                        }
+                    if (videoScreenSub) {
+                        videoScreenSub.innerHTML = "";
+                        videoScreenSub.style.display = "none";
+                    }
+                    return;
+                }
+                
+                const jsonEl = holder.querySelector("#segments_json_data") || holder;
+                const b64 = jsonEl.textContent.trim();
+                if (!b64 || b64 === "W10=") {
+                    if (overlay) {
                         overlay.innerHTML = "";
                         overlay.style.display = "none";
-                        return;
+                    }
+                    if (videoScreenSub) {
+                        videoScreenSub.innerHTML = "";
+                        videoScreenSub.style.display = "none";
+                    }
+                    return;
+                }
+                
+                try {
+                    const jsonStr = decodeURIComponent(escape(atob(b64)));
+                    const segments = JSON.parse(jsonStr);
+                    let activeText = "";
+                    for (const seg of segments) {
+                        if (currentTime >= seg.start && currentTime <= seg.end) {
+                            if (mode === "Original") {
+                                activeText = seg.text || "";
+                            } else if (mode === "Translation (Fitted)") {
+                                activeText = seg.translated_text || "";
+                            } else if (mode === "Translation (Normal)") {
+                                activeText = seg.normal_text || seg.translated_text || "";
+                            }
+                            break;
+                        }
                     }
                     
-                    try {
-                        const jsonStr = decodeURIComponent(escape(atob(b64)));
-                        const segments = JSON.parse(jsonStr);
-                        let activeText = "";
-                        for (const seg of segments) {
-                            if (currentTime >= seg.start && currentTime <= seg.end) {
-                                if (mode === "Original") {
-                                    activeText = seg.text || "";
-                                } else if (mode === "Translation (Fitted)") {
-                                    activeText = seg.translated_text || "";
-                                } else if (mode === "Translation (Normal)") {
-                                    activeText = seg.normal_text || seg.translated_text || "";
-                                }
-                                break;
-                            }
-                        }
-                        
-                        if (Math.random() < 0.05) {
-                            debugLog("Time: " + currentTime.toFixed(2) + "s, Mode: " + mode + ", Segs: " + segments.length + ", Text: '" + activeText + "'");
-                        }
-                        
-                        if (activeText) {
+                    if (activeText) {
+                        if (overlay) {
                             overlay.innerHTML = activeText;
                             overlay.style.display = "block";
-                        } else {
+                        }
+                        if (videoScreenSub) {
+                            videoScreenSub.innerHTML = activeText;
+                            videoScreenSub.style.display = "block";
+                        }
+                    } else {
+                        if (overlay) {
                             overlay.innerHTML = "";
                             overlay.style.display = "none";
                         }
-                    } catch (e) {
-                        debugLog("Error parsing/decoding segments: " + e.message);
+                        if (videoScreenSub) {
+                            videoScreenSub.innerHTML = "";
+                            videoScreenSub.style.display = "none";
+                        }
                     }
-                });
+                } catch (e) {
+                    debugLog("Error parsing/decoding segments: " + e.message);
+                }
+            };
+            
+            window.updateZastSubtitles = updateSubtitles;
+            
+            if (!player.dataset.hasTimeupdate) {
+                player.dataset.hasTimeupdate = "true";
+                debugLog("Found player! Attaching timeupdate, seeked, pause, play listeners. Tag: " + player.tagName);
+                player.addEventListener("timeupdate", updateSubtitles);
+                player.addEventListener("seeked", updateSubtitles);
+                player.addEventListener("pause", updateSubtitles);
+                player.addEventListener("play", updateSubtitles);
             }
+            
+            updateSubtitles();
         } else {
             if (Math.random() < 0.05) {
                 debugLog("No player element found in page yet.");
@@ -3990,7 +4077,7 @@ def _get_tab_guide_html(tab_num: int) -> str:
     </div>
     '''
 
-with gr.Blocks(title="ZastTranslate", theme=gr.themes.Soft(primary_hue="indigo", secondary_hue="slate", neutral_hue="slate")) as app:
+with gr.Blocks(title="ZastTranslate") as app:
     # Embed logo as base64 to avoid Gradio version compatibility issues
     import base64 as _b64
     _logo_path = os.path.join(BASE_DIR, "zastttranslate.png")
@@ -4102,13 +4189,20 @@ with gr.Blocks(title="ZastTranslate", theme=gr.themes.Soft(primary_hue="indigo",
                             label="Source Language", value="Auto",
                             info="Source audio language. Leave on Auto or select manually for maximum speed."
                         )
-                        model_size = gr.Dropdown(["base", "small", "medium", "large-v3"], label="Whisper Model", value="base", info="'base' is fast; 'large-v3' gives maximum transcription accuracy.")
+                        model_size = gr.Dropdown(["base", "small", "medium", "large-v3"], label="Whisper Model", value="large-v3", info="'large-v3' gives maximum transcription accuracy.")
                         llm_backend_dropdown = gr.Dropdown(
                             choices=list(available_llm_backends.keys()),
                             value=current_llm_backend,
                             label="LLM Model (Translation / SEO)",
                             interactive=True,
-                            info="Local LLM used for syllable-fitted translation and Humanizer SEO writing."
+                            info="Select the local AI brain used for subtitle translation, SEO articles, and Shorts moments."
+                        )
+                    with gr.Accordion("💡 Guide: Choosing the Right LLM Model for Your GPU (VRAM & Performance Impact)", open=False):
+                        gr.Markdown(
+                            "> **Which model should you choose for your PC?**\n"
+                            "> * 🌟 **Qwen3.5-9B (Recommended — 12 to 24 GB VRAM)**: The newest, smartest, and most nuanced model. Understands colloquial speech, idioms, cultural nuance, and generates highly natural human-grade SEO articles. Best for RTX 3060 12G, RTX 4070, RTX 3080/3090/4080/4090. *(On 8 GB GPUs, Windows may page memory to Shared System RAM, slowing down generation)*.\n"
+                            "> * ⚡ **Qwen2.5-7B-Instruct (Ideal for 8 GB VRAM GPUs)**: Fast and lightweight (~4.5 GB VRAM). Fits 100% inside 8 GB VRAM (RTX 4060, RTX 3070, laptops) with zero Windows memory paging slowdowns, offering outstanding translation fidelity across 33 languages.\n"
+                            "> * 🇪🇺 **EuroLLM-9B-Instruct (European Languages — 12 GB+)**: Specialized precision engine for 12 major European languages (FR, EN, ES, DE, IT, PT, NL, PL, SV, CS, RO, HU) with rich idiomatic expressions."
                         )
                     with gr.Row():
                         btn_transcribe = gr.Button("▶️ Run Transcription", interactive=False, variant="primary", elem_id="btn_run_transcription")
@@ -5191,8 +5285,8 @@ with gr.Blocks(title="ZastTranslate", theme=gr.themes.Soft(primary_hue="indigo",
 
     tts_backend_dropdown.change(on_tts_backend_change, inputs=[tts_backend_dropdown], outputs=[])
 
-    btn_transcribe.click(step2_transcribe, [lang_source, model_size], [transcription_status, transcription_df, segments_json_holder, export_transcription_file], show_progress="full")
-    btn_import_srt.click(step2b_import_srt, [srt_file_input, lang_source], [transcription_status, transcription_df, segments_json_holder, export_transcription_file], show_progress="full", js=JS_SRT_WAIT)
+    btn_transcribe.click(step2_transcribe, [lang_source, model_size], [transcription_status, transcription_df, segments_json_holder, export_transcription_file, subtitle_selection], show_progress="full")
+    btn_import_srt.click(step2b_import_srt, [srt_file_input, lang_source], [transcription_status, transcription_df, segments_json_holder, export_transcription_file, subtitle_selection], show_progress="full", js=JS_SRT_WAIT)
     
     btn_valid_transcription.click(step3_save_transcription, [transcription_df], [transcription_status, btn_translate, btn_bulk_run, segments_json_holder, export_transcription_file])
     btn_clean_transcription.click(step2_clean_transcription, [transcription_df, lang_source], [transcription_status, transcription_df, segments_json_holder, export_transcription_file], show_progress="full")
@@ -5222,7 +5316,7 @@ with gr.Blocks(title="ZastTranslate", theme=gr.themes.Soft(primary_hue="indigo",
     btn_translate.click(
         step4_translate,
         [lang_target, original_title_input, original_desc_input],
-        [translation_status, translation_df, segments_json_holder, translated_title_input, translated_desc_input, export_translation_file],
+        [translation_status, translation_df, segments_json_holder, translated_title_input, translated_desc_input, export_translation_file, subtitle_selection],
         show_progress="full"
     )
     
@@ -5252,7 +5346,7 @@ with gr.Blocks(title="ZastTranslate", theme=gr.themes.Soft(primary_hue="indigo",
         fn=None,
         inputs=[subtitle_selection],
         outputs=None,
-        js="(val) => { window.ZastSubtitleMode = val; }"
+        js="(val) => { window.ZastSubtitleMode = val; if (window.updateZastSubtitles) { window.updateZastSubtitles(); } }"
     )
     
     # Text source change warning & table data updates
@@ -5893,9 +5987,10 @@ with gr.Blocks(title="ZastTranslate", theme=gr.themes.Soft(primary_hue="indigo",
             return (
                 None, None,
                 gr.update(interactive=False), gr.update(interactive=False), gr.update(interactive=False), gr.update(interactive=False),
-                gr.update(value=None), _get_empty_segments_html(),
-                gr.update(value=None), gr.update(value=None),
-                "", "", "", ""
+                None, _get_empty_segments_html(),
+                None, None,
+                "", "", "", "",
+                "None", "", None
             )
             
         has_segments = len(state.segments) > 0
@@ -5904,35 +5999,56 @@ with gr.Blocks(title="ZastTranslate", theme=gr.themes.Soft(primary_hue="indigo",
         video_val = state.video_info.get('video_path') if 'video_path' in state.video_info else None
         is_audio = state.video_info.get('is_audio_only', False)
         
-        # Transcription dataframe
-        trans_update = gr.update(value=None)
+        # Transcription dataframe (plain list or None - avoid gr.update which empties DataframeData in Gradio 6)
+        trans_update = None
         if has_segments:
             trans_data = []
             for seg in state.segments:
                 trans_data.append([round(seg['start'], 2), round(seg['end'], 2), seg['text']])
-            trans_update = gr.update(value=trans_data)
+            trans_update = trans_data
                 
         # Translation dataframe
-        trans_df_update = gr.update(value=None)
+        trans_df_update = None
         if has_translated:
             trans_data_df = []
             for seg in state.translated_segments:
-                normal_text = seg.get("normal_text", "")
-                status = "Ready" if find_segment_audio_path(seg.get('start', 0.0), lang=state.video_info.get('target_language')) else "Not Generated"
-                trans_data_df.append([round(seg.get('start', 0.0), 2), round(seg.get('end', 0.0), 2), seg.get('text', ''), normal_text, status])
-            trans_df_update = gr.update(value=trans_data_df)
+                normal_text = seg.get("normal_text", seg.get("translated_text", ""))
+                fitted = seg.get("translated_text", "")
+                duration = seg.get("end", 0.0) - seg.get("start", 0.0)
+                status = "✅"
+                trans_data_df.append([
+                    round(seg.get('start', 0.0), 2), 
+                    round(seg.get('end', 0.0), 2), 
+                    seg.get('text', ''), 
+                    normal_text, 
+                    f"{status} {fitted}"
+                ])
+            trans_df_update = trans_data_df
                 
         # Dubbing segments dataframe
-        dubbing_update = gr.update(value=None)
+        dubbing_update = None
         if has_translated:
             dubbing_data = _build_dubbing_df_data("Fitted Translation")
-            dubbing_update = gr.update(value=dubbing_data)
+            dubbing_update = dubbing_data
             
         # Metadata
         orig_title = state.video_info.get('title', '')
         orig_desc = state.video_info.get('description', '')
         trans_title = state.video_info.get('translated_title', '')
         trans_desc = state.video_info.get('translated_description', '')
+        
+        # Subtitles mode & export files
+        sub_mode = "None"
+        if has_translated:
+            sub_mode = "Translation (Fitted)"
+        elif has_segments:
+            sub_mode = "Original"
+
+        src_lang = state.video_info.get('detected_language', 'fr') if state.video_info else 'fr'
+        iso = _get_iso_code(src_lang)
+        srt_cand = os.path.join(OUTPUT_DIR, f"transcription_{iso}.srt")
+        trans_file = srt_cand if os.path.exists(srt_cand) else None
+        trans_status = f"Transcription loaded ({len(state.segments)} segments). Subtitles ready to edit below." if has_segments else ""
         
         return (
             # video_preview, audio_preview
@@ -5953,7 +6069,11 @@ with gr.Blocks(title="ZastTranslate", theme=gr.themes.Soft(primary_hue="indigo",
             gr.update(value=orig_title),
             gr.update(value=orig_desc),
             gr.update(value=trans_title),
-            gr.update(value=trans_desc)
+            gr.update(value=trans_desc),
+            # subtitle_selection, transcription_status, export_transcription_file
+            sub_mode,
+            trans_status,
+            trans_file
         )
 
     def on_tab_select(*args):
@@ -6017,7 +6137,8 @@ with gr.Blocks(title="ZastTranslate", theme=gr.themes.Soft(primary_hue="indigo",
             btn_transcribe, btn_translate, btn_synth, btn_bulk_run,
             transcription_df, segments_json_holder,
             translation_df, dubbing_segments_df,
-            original_title_input, original_desc_input, translated_title_input, translated_desc_input
+            original_title_input, original_desc_input, translated_title_input, translated_desc_input,
+            subtitle_selection, transcription_status, export_transcription_file
         ]
     )
 
@@ -6029,10 +6150,11 @@ if __name__ == "__main__":
         port = int(sys.argv[1])
     app.queue() # Enable websocket queue to prevent GPU process thread deadlocks
     try:
+        _theme = gr.themes.Soft(primary_hue="indigo", secondary_hue="slate", neutral_hue="slate")
         app.launch(
             server_name="127.0.0.1",
             server_port=port,
-            theme=gr.themes.Soft(),
+            theme=_theme,
             allowed_paths=[BASE_DIR],
             js=BLOCKS_JS,
             css=BLOCKS_CSS,
@@ -6041,7 +6163,7 @@ if __name__ == "__main__":
         # Port is already bound -> automatically pick next available open port
         app.launch(
             server_name="127.0.0.1",
-            theme=gr.themes.Soft(),
+            theme=_theme,
             allowed_paths=[BASE_DIR],
             js=BLOCKS_JS,
             css=BLOCKS_CSS,

@@ -7,13 +7,13 @@ from config import DEVICE, GPU_VRAM
 MIN_CUE_WORDS = 3
 MIN_CUE_DURATION_MS = 400
 
-def split_segment(seg, max_duration=8.0, max_chars=75, min_words=MIN_CUE_WORDS, min_duration_ms=MIN_CUE_DURATION_MS):
+def split_segment(seg, max_duration=9.0, max_chars=110, min_words=MIN_CUE_WORDS, min_duration_ms=MIN_CUE_DURATION_MS):
     """
     Split a single segment into smaller cues if it exceeds max_duration or max_chars.
-    Uses word-level timestamps from WhisperX to strictly avoid orphans:
-    - No cue with fewer than min_words (3) words unless followed by strong punctuation (. ? ! … ; :).
-    - No cue with duration under min_duration_ms (400ms) unless followed by strong punctuation.
-    - Remaining words under threshold are kept on the current cue or merged into the previous cue.
+    Uses word-level timestamps from WhisperX to strictly avoid orphans and broken sentence cuts:
+    - Never split mid-phrase without punctuation unless exceeding max_duration.
+    - No cue with fewer than min_words (3) words unless the entire segment is that short.
+    - Trailing words under threshold (even if ending with a period like 'caisse.') are merged into the previous cue.
     """
     duration = seg.get('end', 0.0) - seg.get('start', 0.0)
     text = seg.get('text', '')
@@ -76,18 +76,18 @@ def split_segment(seg, max_duration=8.0, max_chars=75, min_words=MIN_CUE_WORDS, 
             rem_last_text = rem_words[-1].get('word', '').strip()
             rem_ends_strong = any(rem_last_text.endswith(p) for p in strong_puncts)
             
-            # Check if splitting here would leave an invalid orphan remainder
-            rem_is_too_short = (rem_count < min_words or rem_dur < min_duration) and not rem_ends_strong
+            # Check if splitting here would leave an invalid orphan remainder (< 3 words)
+            rem_is_too_short = (rem_count < min_words or rem_dur < min_duration)
             
             should_split = False
             if not rem_is_too_short:
                 if has_strong_punct and curr_dur >= 2.5:
                     should_split = True
-                elif has_weak_punct and curr_dur >= 4.5:
+                elif has_weak_punct and curr_dur >= 4.0:
                     should_split = True
                 elif curr_dur >= max_duration:
                     should_split = True
-                elif curr_len >= max_chars:
+                elif curr_len >= max_chars and (has_strong_punct or has_weak_punct):
                     should_split = True
                     
             if should_split:
@@ -99,13 +99,10 @@ def split_segment(seg, max_duration=8.0, max_chars=75, min_words=MIN_CUE_WORDS, 
         # Handle remaining words
         if curr_words:
             curr_dur = curr_words[-1]['end'] - curr_words[0]['start']
-            curr_last_text = curr_words[-1].get('word', '').strip()
-            curr_ends_strong = any(curr_last_text.endswith(p) for p in strong_puncts)
-            
-            is_orphan = (len(curr_words) < min_words or curr_dur < min_duration) and not curr_ends_strong
+            is_orphan = (len(curr_words) < min_words or curr_dur < min_duration)
             
             if is_orphan and sub_segs:
-                # Merge into the previous sub-segment instead of expelling an orphan
+                # Merge into the previous sub-segment instead of expelling a 1-2 word orphan
                 prev = sub_segs[-1]
                 prev['words'].extend(curr_words)
                 prev['end'] = round(curr_words[-1]['end'], 3)
@@ -282,11 +279,13 @@ class Transcriber:
             torch.backends.cudnn.allow_tf32 = True
             print("TF32 re-enabled after transcription")
         
-        split_segs = split_long_segments(result["segments"], max_duration=8.0, max_chars=75)
+        split_segs = split_long_segments(result["segments"], max_duration=9.0, max_chars=110)
         print(f"Split long segments: {len(result['segments'])} -> {len(split_segs)}")
         
         # Step 3: Merge solitary orphan punctuation lines and remove empty cues
         split_segs = merge_orphan_punctuation_segments(split_segs)
+        from modules.srt_parser import merge_sentence_fragments
+        split_segs = merge_sentence_fragments(split_segs)
         from modules.srt_cleaner import (
             remove_empty_cues_and_redistribute,
             fix_inter_cue_casing,

@@ -2,7 +2,118 @@ import os
 import re
 from modules.utils import format_timestamp, seconds_from_srt_timestamp
 
+DANGLING_CONNECTORS = {
+    "si", "que", "de", "le", "la", "les", "des", "pour", "avec", "dans", "sans", "sur",
+    "sous", "en", "par", "à", "au", "aux", "et", "ou", "mais", "car", "donc", "un", "une",
+    "du", "d'", "l'", "c'", "qu'", "ce", "cette", "ces", "mon", "ton", "son", "notre", "votre", "leur",
+    "après", "avant", "pendant", "vers", "chez",
+    "if", "and", "the", "to", "of", "in", "for", "on", "with", "that", "this", "as", "at", "by", "or", "but"
+}
+
+SENTENCE_STARTERS = {
+    "parce", "car", "mais", "or", "donc", "ensuite", "puis", "enfin", "d'ailleurs", "selon", "d'après", "en"
+}
+
+def merge_sentence_fragments(segments, max_gap=2.2, max_combined_duration=16.0):
+    """
+    Merge sentence fragments, dangling clauses, and stranded orphan words into grammatically complete sentences.
+    Guarantees no broken mid-clause cuts (e.g. '...exonération si' + 'votre vente...', '...ticket de' + 'caisse.', etc.).
+    """
+    if not segments or len(segments) <= 1:
+        return segments
+
+    terminals = ('.', '?', '!', '...', '…', ':', '»', '"')
+
+    # Pre-pass: If a segment ends in a comma and next begins with a clear sentence starter ("D'après", "Selon"),
+    # convert comma to a period so independent sentences don't merge across unrelated topics.
+    for i in range(len(segments) - 1):
+        curr_text = segments[i].get('text', '').strip()
+        next_text = segments[i + 1].get('text', '').strip()
+        next_first = next_text.split()[0].lower() if next_text.split() else ""
+        if next_first in ["d'après", "selon", "voilà", "maintenant"] and curr_text.endswith(','):
+            segments[i]['text'] = curr_text.rstrip(',') + '.'
+
+    # Pass 1: Forward-merge orphan sentence starters (e.g. "Parce que le BOFIP," with next segment)
+    pass1 = []
+    skip_next = False
+    for i in range(len(segments)):
+        if skip_next:
+            skip_next = False
+            continue
+        curr = dict(segments[i])
+        curr_text = curr.get('text', '').strip()
+        curr_words = curr_text.split()
+        first_word = curr_words[0].lower().rstrip(",;:") if curr_words else ""
+        
+        if i < len(segments) - 1 and (len(curr_words) <= 4 or (curr.get('end', 0) - curr.get('start', 0)) < 1.8):
+            next_seg = segments[i + 1]
+            comb_dur = next_seg.get('end', 0.0) - curr.get('start', 0.0)
+            gap = next_seg.get('start', 0.0) - curr.get('end', 0.0)
+            if (first_word in SENTENCE_STARTERS or not any(curr_text.endswith(p) for p in terminals)) and comb_dur <= 16.0 and gap <= 2.5:
+                curr['end'] = next_seg['end']
+                curr['text'] = f"{curr_text} {next_seg.get('text', '').strip()}"
+                if 'words' in curr and 'words' in next_seg:
+                    curr['words'] = curr.get('words', []) + next_seg.get('words', [])
+                pass1.append(curr)
+                skip_next = True
+                continue
+        pass1.append(curr)
+
+    # Pass 2: Backward-merge dangling ends and incomplete sentences
+    merged = []
+    for s in pass1:
+        if not merged:
+            merged.append(dict(s))
+            continue
+        
+        prev = merged[-1]
+        gap = s.get('start', 0.0) - prev.get('end', 0.0)
+        combined_dur = s.get('end', 0.0) - prev.get('start', 0.0)
+        prev_text = prev.get('text', '').strip()
+        curr_text = s.get('text', '').strip()
+        
+        prev_words = prev_text.split()
+        prev_last_word = prev_words[-1].lower().rstrip(".,;:\"'«»…") if prev_words else ""
+        is_dangling_tail = prev_last_word in DANGLING_CONNECTORS
+        prev_ends_terminal = any(prev_text.endswith(p) for p in ('.', '?', '!')) and not is_dangling_tail
+        
+        curr_words = curr_text.split()
+        is_trailing_orphan = len(curr_words) <= 3 or (s.get('end', 0) - s.get('start', 0)) < 2.0
+        
+        should_merge = False
+        
+        if prev_ends_terminal:
+            if len(curr_words) == 1 and combined_dur <= 14.0:
+                should_merge = True
+        else:
+            if is_dangling_tail and combined_dur <= 18.5:
+                should_merge = True
+            elif is_trailing_orphan and combined_dur <= 18.5:
+                should_merge = True
+            elif len(curr_words) <= 6 and curr_text.lower().startswith(('ou ', 'et ', 'mais ', 'car ', 'donc ', 'par ', 'de ')) and combined_dur <= 18.5:
+                should_merge = True
+            elif gap <= max_gap and combined_dur <= max_combined_duration:
+                should_merge = True
+            elif len(curr_words) <= 6 and combined_dur <= 17.0:
+                should_merge = True
+            
+        if should_merge:
+            prev['end'] = s['end']
+            prev['text'] = f"{prev_text} {curr_text}"
+            if 'words' in prev and 'words' in s:
+                prev['words'] = prev.get('words', []) + s.get('words', [])
+        else:
+            merged.append(dict(s))
+            
+    for idx, m in enumerate(merged, 1):
+        m["index"] = idx
+        
+    return merged
+
 class SRTParser:
+    def merge_sentence_fragments(self, segments, max_gap=2.2, max_combined_duration=16.0):
+        return merge_sentence_fragments(segments, max_gap=max_gap, max_combined_duration=max_combined_duration)
+
     def parse_srt(self, srt_path):
         """
         Parse an SRT file and return a list of segments.
@@ -34,6 +145,7 @@ class SRTParser:
         
         from modules.transcriber import merge_orphan_punctuation_segments
         segments = merge_orphan_punctuation_segments(segments)
+        segments = merge_sentence_fragments(segments)
         for i, s in enumerate(segments, 1):
             s["index"] = i
 

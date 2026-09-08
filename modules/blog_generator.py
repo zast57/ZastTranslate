@@ -170,6 +170,7 @@ def format_seo_title(title: str, is_fr: bool = True) -> str:
 
     # Brand maps
     brand_map = {
+        r"\bpok[eé]mon\b": "Pokémon",
         r"\bherm[eè]s\s+agent\b": "Hermès Agent",
         r"\bherm[eè]s\b": "Hermès",
         r"\bwindows\b": "Windows",
@@ -192,21 +193,45 @@ def format_seo_title(title: str, is_fr: bool = True) -> str:
     for pat, rep in brand_map.items():
         t = re.sub(pat, rep, t, flags=re.IGNORECASE)
 
-    # SEO character calibration (ideally 50-65 chars for Google SERP)
-    if len(t) > 65:
-        # If there is a colon, check if the main part alone or a trimmed subtitle fits
+    # Strip emojis from SEO title and collapse multiple spaces
+    emoji_pattern = re.compile(r'[\U00010000-\U0010ffff]', flags=re.UNICODE)
+    t = emoji_pattern.sub(' ', t).strip()
+    t = re.sub(r'\s+', ' ', t).strip()
+
+    # If title has a trailing parenthetical clause and exceeds 75 chars, strip it cleanly
+    if len(t) > 75 and re.search(r'\s*[\(\[][^\)\]]*[\)\]]\s*$', t):
+        without_parens = re.sub(r'\s*[\(\[][^\)\]]*[\)\]]\s*$', '', t).strip()
+        if len(without_parens) >= 30:
+            t = without_parens
+
+    # If title is over 85 characters, shorten gracefully
+    if len(t) > 85:
         if " : " in t:
             main_p, sub_p = t.split(" : ", 1)
-            if 45 <= len(main_p) <= 65:
-                # If main part is strong and fits sweet spot, keep main part
+            if len(main_p) >= 30:
                 t = main_p
             else:
-                # Trim cleanly at last space before 65
-                trimmed = t[:65].rsplit(" ", 1)[0]
-                t = re.sub(r'[\s\-:_]+$', '', trimmed).strip()
+                t = t[:85].rsplit(" ", 1)[0]
         else:
-            trimmed = t[:65].rsplit(" ", 1)[0]
-            t = re.sub(r'[\s\-:_]+$', '', trimmed).strip()
+            t = t[:85].rsplit(" ", 1)[0]
+
+    # Clean any dangling unclosed parenthesis, bracket, quote or trailing separators
+    t = re.sub(r'\s*[\(\[][^\)\]]*$', '', t).strip()
+    t = re.sub(r'[\s\-:_,\.]+$', '', t).strip()
+
+    # Never allow dangling functional words at the end of the title
+    dangling_words = {
+        "de", "des", "du", "d'", "le", "la", "les", "un", "une", "vos", "votre", 
+        "notre", "nos", "leur", "leurs", "son", "sa", "ses", "mon", "ma", "mes", 
+        "ce", "cet", "cette", "ces", "pour", "sur", "dans", "avec", "par", "en", 
+        "à", "et", "ou", "que", "qui", "si", "aux", "au",
+        "of", "the", "a", "an", "your", "our", "their", "for", "on", "in", "with", "by", "to", "and", "or", "that"
+    }
+    words = t.split()
+    while words and words[-1].lower().rstrip(".,:;!?") in dangling_words:
+        words.pop()
+    t = " ".join(words).strip()
+    t = re.sub(r'[\s\-:_,\.]+$', '', t).strip()
 
     return t
 
@@ -675,253 +700,110 @@ class SEOArticleGenerator:
         # Anti-AI Detection Rules & Guidelines in target language (Humanizer 35-Pattern Benchmark)
         if lang_code == "fr":
             system_prompt = (
-                "Tu es un journaliste tech de référence et rédacteur web d'élite francophone (style Korben, Frandroid, Ars Technica).\n"
-                "Ta mission est de rédiger un article de blog complet, percutant, riche en substance technique et optimisé SEO à partir des faits réels tirés de la transcription.\n\n"
-                "POSTURE ÉDITORIALE INCARNÉE (RÈGLE ESSENTIELLE) :\n"
-                "- Tu incarnes le testeur qui a installé, configuré et éprouvé l'outil sur son propre PC. Tu emploies une voix incarnée vivante : le 'Je' de retour d'expérience pratique ('Je l'ai installé de bout en bout sur mon PC...', 'Dans mes tests, je lui ai demandé...') et le 'Vous' pour guider et conseiller le lecteur.\n"
-                "- Tu rédiges un article de blog natif pour des lecteurs du web. Tu ne résumes JAMAIS une vidéo et tu ne commentes JAMAIS ce qu'un tiers fait à l'écran !\n"
-                "- INTERDICTION STRICTE DU STYLE ORAL ET DE LA PARAPHRASE MINUTE PAR MINUTE DES SOUS-TITRES :\n"
-                "  * Ne décris JAMAIS les actions orales de la vidéo : BANNIS ABSOLUMENT 'Là je vous montre', 'Là il cherche en accéléré', 'Là j'ai cliqué sur Close', 'Là j'ai stoppé le prompt', 'Sur la droite j'ai mon graphique', 'En bas à droite je peux changer mon modèle', 'Moi je n'ai pas envie de le faire'.\n"
-                "  * Tu rédiges une SYNTHÈSE THÉMATIQUE STRUCTURÉE, pas un commentaire audio de ce qui se passe sur un écran !\n"
-                "- INTERDICTION FORMELLE d'employer : 'la vidéo précise', 'la vidéo montre', 'dans cette vidéo', 'dans la vidéo', 'au cours de la vidéo', 'l'auteur mentionne', 'l'auteur explique', 'l'auteur précise', 'le créateur', 'le présentateur', 'l'intervenant', 'comme vu dans la vidéo', 'comme montré à l'écran'.\n"
-                "- INTERDICTION FORMELLE DES FORMULES D'APPEL À L'ACTION VIDÉO : Ne termine JAMAIS par 'N'hésitez pas à liker, partager, commenter et vous abonner à la chaîne', 'laissez un pouce bleu', 'activez la cloche', 'à la prochaine' ou 'liens en description'. Tu rédiges un article de blog écrit !\n\n"
+                "Tu es un journaliste et rédacteur web d'élite francophone.\n"
+                "Ta mission est de rédiger un article de blog complet, percutant, riche en substance et optimisé SEO à partir des faits réels tirés de la transcription.\n\n"
+                "POSTURE ÉDITORIALE :\n"
+                "- Tu rédiges un article de blog natif pour des lecteurs du web. Tu adoptes le ton correspondant au style demandé.\n"
+                "- Tu ne résumes JAMAIS une vidéo et tu ne commentes JAMAIS ce qu'un tiers fait à l'écran !\n"
+                "- INTERDICTION FORMELLE du style oral et de la description d'écran : BANNIS ABSOLUMENT 'Là je vous montre', 'Dans cette vidéo', 'La vidéo montre', 'Le présentateur explique', 'Comme vu à l'écran', 'N'hésitez pas à vous abonner'. Rédige un article écrit de fond !\n\n"
                 "RÈGLES FORMELLES STRICTES ANTI-DÉTECTION IA (HUMANIZER BENCHMARK) :\n"
-                "1. INTERDICTION ABSOLUE DU POINT-VIRGULE (;) : N'utilise AUCUN point-virgule (;) dans toute la prose. Le point-virgule trahit immédiatement un texte généré par IA. Rédige des phrases courtes, directes et rythmées, séparées par des points simples (.).\n"
-                "2. INTERDICTION DES TIRETS CADRATINS (— ou –) dans la prose : Utilise des virgules, des parenthèses ou des deux-points.\n"
-                "3. ZÉRO EMOJI DANS LES TITRES DE SECTIONS : Les titres H1, H2, H3 doivent être sobres, professionnels et sans aucun emoji.\n"
-                "4. TITRE SEO : Calibré strictement entre 50 et 65 caractères, sans guillemets, en casse de phrase (ex: 'Hermes Agent Windows : installation et prise en main pas à pas').\n"
-                "5. AUCUN SUPERLATIF CREUX NI HYPE : Bannis 'révolutionnaire', 'couteau suisse', 'époustouflant', 'incontournable', 'game changer', 'tournant décisif'. Reste factuel, précis et mesuré.\n"
-                "6. AUCUNE INTRO NI CONCLUSION BANALE : Pas de 'Dans cet article nous allons explorer' ni 'À l'ère du numérique'. Pas de 'En conclusion' ni 'Pour conclure'. Utilise un titre d'action comme 'Mon avis : pour qui et pour quoi faire ?' ou 'Ce qu'il faut retenir'.\n\n"
-                "FIDÉLITÉ TECHNIQUE CHIRURGICALE AUX FAITS (NE RIEN INVENTER) :\n"
-                "- Correction des erreurs phonétiques Whisper : Attention, les sous-titres Whisper comportent des transcriptions phonétiques approximatives. Exemple crucial : quand la transcription mentionne 'Morpheus', il s'agit en réalité d'un **jeu de morpion** (tic-tac-toe) interactif codé et lancé en direct !\n"
-                "- Prérequis matériels réels : L'application elle-même est légère et tourne dès 4 Go de RAM avec une API distante. La machine montrée dans l'inspection système (128 Go de RAM, RTX 4090 + puce graphique intégrée) était simplement la configuration personnelle du testeur, pas les prérequis de l'outil !\n"
-                "- Modes d'exécution du cerveau LLM : Clarifie les deux options réelles :\n"
-                "  * Option 1 (API distante cloud : NVIDIA NIM, Claude, OpenAI...) : zéro charge sur le PC local, tourne sur n'importe quelle machine sans carte graphique dédiée, mais attention aux quotas d'API gratuites qui bloquent vite.\n"
-                "  * Option 2 (Modèle en local avec Ollama) : 100% gratuit et privé, aucune donnée ne sort du PC, mais nécessite au moins 16 Go de RAM et un GPU 8 Go VRAM recommandé. Attention au piège du contexte : Hermes exige un contexte d'au moins 64 000 tokens (65 536 dans Ollama), sinon il refuse de démarrer.\n"
-                "- Installation Windows isolée : L'installeur officiel s'installe dans %LOCALAPPDATA%\\hermes, installe ses propres versions isolées de Python, Node.js et Git sans droits administrateur et sans toucher aux variables d'environnement globales de Windows.\n"
-                "- Cas d'usage réels et démonstrations concrètes : Développe en détail les vrais cas testés :\n"
-                "  * Coder et lancer une application de zéro (ex: jeu de morpion interactif codé et exécuté en une commande).\n"
-                "  * Automatiser des tâches récurrentes avec cron (sorties cinéma le mercredi à 6h du matin avec résumé et filtre de genres ; surveillance des prix de billets d'avion Paris-Tokyo toutes les 5h avec alerte sous les 600€).\n"
-                "  * Manipuler et analyser les données locales (inspection de l'espace restant sur le disque C et détection des dossiers les plus lourds ; génération d'un graphique météo interactif HTML sauvegardé sur le disque).\n"
-                "  * Pilotage à distance depuis son smartphone avec un bot Telegram (connecteur Telegram intégré).\n"
-                "  * Dictée vocale avec le micro directement intégré dans l'interface.\n"
-                "- La contrepartie / Sécurité : Comme l'agent a un accès direct au système de fichiers et au shell pour exécuter du code, il faut le manipuler avec discernement."
+                "1. INTERDICTION ABSOLUE DU POINT-VIRGULE (;) : N'utilise AUCUN point-virgule dans toute la prose. Rédige des phrases courtes, rythmées et directes, séparées par des points simples (.).\n"
+                "2. INTERDICTION DES TIRETS CADRATINS (— ou –) dans la prose : Utilise des virgules, parenthèses ou deux-points.\n"
+                "3. ZÉRO EMOJI DANS LES TITRES : Les titres H1, H2, H3 doivent être sobres, professionnels et sans aucun emoji.\n"
+                "4. TITRE SEO : Calibré entre 50 et 75 caractères, naturel, complet (sans parenthèse non refermée ni phrase coupée).\n"
+                "5. AUCUN SUPERLATIF CREUX NI HYPE : Bannis 'révolutionnaire', 'couteau suisse', 'game changer'. Reste factuel, précis et mesuré.\n"
+                "6. AUCUNE INTRO OU CONCLUSION BANALE : Pas de 'Dans cet article', pas de 'En conclusion'. Utilise un titre d'action comme 'Ce qu'il faut retenir'.\n\n"
+                "FIDÉLITÉ AUX FAITS (NE RIEN INVENTER) :\n"
+                "- Base-toi exclusivement sur les faits, chiffres, règles, méthodes et explications développés dans la transcription.\n"
+                "- N'invente aucun élément étranger au sujet réel de la transcription."
             )
 
-            user_prompt = f"""Rédige un article de blog SEO complet et de référence sur le sujet suivant.
+            user_prompt = f"""Rédige un article de blog SEO complet et approfondi sur le sujet suivant.
 
 INFORMATIONS SUR LE SUJET DU GUIDE :
-- Sujet principal : {video_title or 'Guide pratique et tutoriel pas à pas'}
-- Thématique : Tutoriel technique d'installation et cas d'usage réels
+- Sujet principal : {video_title or 'Guide pratique et analyse complète'}
 - Style rédactionnel souhaité : {style} -> {style_prompt}
 - Longueur cible : environ {target_words} mots
-- Langue de rédaction : Français (naturel, soigné, sans fioritures, avec le ton incarné de l'expérimentateur terrain)
+- Langue de rédaction : Français (naturel, soigné, sans fioritures)
 - {kw_instruction_fr}
 
-EXEMPLAIRE COMPLET DU NIVEAU D'EXCELLENCE ATTENDU (MODÈLE ET STRUCTURE DE RÉFÉRENCE) :
-Voici exactement le plan thématique, la densité technique, le ton incarné et le style attendus :
-'''
-# Tutoriel Hermès Agent : installation et configuration sur Windows
-
-On vous propose aujourd'hui d'installer Hermes Agent sur Windows. C'est un agent IA open source de Nous Research. Il est gratuit et il tourne sur un ordinateur normal ou encore sur un VPS. La différence avec un ChatGPT classique, c'est qu'il ne se contente pas de répondre : il agit, il garde en mémoire ce que vous lui avez dit et il peut travailler pendant que vous dormez. Cela correspond au mode agent des LLM que l'on peut activer mais en beaucoup plus précis.
-
-Je l'ai installé de bout en bout sur mon PC, avec une API distante d'abord, puis avec Ollama et un LLM en local.
-
-## Hermes Agent, qu'est-ce que c'est ?
-
-Hermes Agent est un agent autonome développé par Nous Research, publié sous licence MIT. Il existe en version terminal et en application de bureau, Hermes Desktop, disponible pour Windows 10 et 11, macOS et Linux.
-
-Ce qui le distingue d'un simple LLM sans agent :
-- Il peut accéder à votre système de fichiers, il lit, il écrit, il exécute.
-- Il peut naviguer sur le web tout seul pour aller chercher une donnée.
-- Il peut mémoriser le contexte d'une session à l'autre.
-- Il installe et crée des compétences, appelées skills (comme sur ChatGPT ou Claude).
-- Il tourne en permanence tant que le serveur est lancé (donc c'est vous qui lancez et fermez votre serveur).
-- Il se pilote en ligne de commande mais aussi avec Telegram, Discord, Slack ou par mail.
-
-## Télécharger et installer Hermes Agent sur Windows
-
-Il faut aller sur le site officiel hermes-agent.nousresearch.com. On appuie sur le bouton Download for Windows.
-
-Vous lancez l'exécutable, vous cliquez sur Install et c'est terminé. Il n'y a aucune ligne de commande à taper et aucune dépendance à installer à la main. L'installeur récupère lui-même Git, Node.js et Python, clone le dépôt dans %LOCALAPPDATA%\\hermes et crée l'environnement virtuel. Il n'y a pas besoin de droits administrateur.
-
-Une fois l'installation finie, vous cliquez sur Launch.
-
-## Connecter un modèle à Hermes Agent
-
-Au premier lancement, Hermes propose son propre portail, le Nous Portal avec ses modèles maison. C'est pratique mais payant avec un abonnement. Si vous avez déjà une clé API ailleurs (ChatGPT, Claude, Gemini), ce n'est pas nécessaire.
-
-Vous cliquez sur I have an API key. Vous avez alors le choix entre OpenAI, Anthropic pour Claude, Qwen et d'autres fournisseurs. De mon côté j'ai utilisé la clé API NVIDIA, qui donne accès gratuitement à un certain nombre de modèles.
-
-Vous collez la clé, vous faites Connect, et vous choisissez votre modèle dans la liste.
-
-Les modèles gratuits fonctionnent mal avec l'API gratuite de NVIDIA. J'ai testé Kimi via l'offre gratuite et l'agent se prend des erreurs de requête. Ce n'est pas un problème d'Hermes, c'est le quota et la limitation des offres gratuites qui coincent. Pour un usage sérieux, il faut soit un modèle payant, soit un modèle en local.
-
-Hermes exige un modèle avec au moins 64 000 tokens de contexte. En dessous, il refuse de démarrer, parce qu'un agent qui enchaîne les appels d'outils a besoin de mémoire de travail. C'est un point important à retenir quand on utilisera Ollama pour faire tourner notre LLM en local.
-
-## Régler l'interface et découvrir les skills
-
-La roue crantée en haut à droite ouvre les préférences. Première chose que j'ai faite : passer en thème sombre, parce que l'interface claire pique un peu les yeux. Vous pouvez aussi changer la disposition des panneaux.
-
-L'onglet Capabilities liste les skills. Un skill, c'est une compétence déjà écrite avec sa procédure étape par étape. L'agent lit les descriptions courtes en permanence et il ne charge le contenu complet que quand la tâche le demande, ce qui évite d'alourdir chaque requête. Certains sont actifs par défaut, les autres s'activent d'un clic.
-
-Dans le catalogue, on trouve par exemple un skill Home Assistant pour la maison connectée. On pourrait demander à Hermes d'allumer une lampe ou de programmer un allumage.
-
-## Premiers tests concrets
-
-Le prompt se trouve en bas de l'écran. On tape en langage naturel sans syntaxe particulière.
-
-- Créer un jeu : Je lui ai demandé un jeu de morpion. Il l'a codé et il a exécuté directement. C'était jouable.
-- Chercher un billet d'avion : Je lui ai demandé les prix Paris-Tokyo pour septembre 2026. Il ouvre un navigateur, il va chercher les données, il se plante, il corrige et il relance. Il explique à chaque étape ce qu'il fait. À un moment il a eu un souci avec Chrome et il a contourné tout seul. Au bout du compte il permet de trouver des opportunités de vols les moins chers avec et sans escale et il pose des questions pour affiner ses recherches.
-- Faire un graphique : J'ai demandé un graphique des températures à Paris pour août 2026. Il est allé chercher les données via une API météo (sans que je lui indique) et il a généré un fichier HTML. Il l'a enregistré sur mon disque sans me demander l'autorisation. Le rendu est propre, exportable en PNG ou en PDF.
-- Interroger la machine : « Combien j'ai de place sur mon disque C ? » Il répond avec la taille totale, l'espace utilisé, l'espace libre et le taux d'occupation. Il s'est trompé de méthode, il s'en est aperçu et il a changé d'approche sans que j'intervienne. Au niveau hardware, il a détecté mes 128 Go de RAM et mes deux GPU, la RTX 4090 plus le GPU intégré à la carte mère.
-
-Il écrit sur le disque et il peut aussi effacer. Je ne lui ai jamais demandé de trier mes photos et je ne le ferai pas. Le niveau de permission se règle dans les paramètres, prenez cinq minutes pour le faire avant de le laisser tourner.
-
-## Créer des jobs automatiques
-
-C'est la fonction la plus intéressante. Hermes intègre un planificateur qui se configure en langage naturel et on n'a pas besoin de faire soi-même un crontab.
-
-Je lui dis : tous les matins à 6h, tu me fais un résumé des derniers articles parus sur mon site paradoxetemporel.fr. Il crée le job, il le confirme et il le déclenche chaque jour tant que le serveur tourne.
-
-J'en ai fait un autre pour la veille tarifaire : toutes les cinq heures, tu vérifies les prix Paris-Tokyo et tu me préviens si tu trouves un aller-retour sous 600 euros.
-
-La condition, c'est que la machine reste allumée et avoir accès à un LLM. Un job planifié sur un PC éteint ne se déclenche pas. Il faut faire tourner Hermes sur une machine qui ne s'arrête jamais comme un vieux PC, un mini-PC ou un VPS que vous louez. Il faut 4 Go de RAM au minimum.
-
-## Recevoir les résultats sur Telegram
-
-Un résumé qui s'affiche dans une console que personne ne regarde ne sert à rien. Hermes propose une passerelle de messagerie qui couvre Telegram, Discord, Slack, WhatsApp, Signal et le mail.
-
-Je l'ai branché à Telegram. Tous les mercredis je reçois sur mon téléphone les sorties ciné de la semaine avec le titre, le genre et un résumé. On peut faire la même chose pour les relevés de température ou les alertes de prix.
-
-Cela fonctionne dans les deux sens. Depuis Telegram, j'envoie la phrase Dis-moi combien j'ai de place restante sur mon disque. Le message part du smartphone, il arrive sur le PC où Hermes tourne, la commande s'exécute, et j'ai la réponse sur Telegram.
-
-## Passer Hermes Agent en local avec Ollama
-
-Jusque-là, j'avais fait des tests par une API distante. Vos données sortent de votre machine et sont donc lisibles par une société. Si cela vous gêne et cela devrait, l'alternative c'est le modèle local mais qui nécessite une machine puissante.
-
-Dans Provider puis Account, vous choisissez le fournisseur auto-hébergé, pas Ollama Cloud mais Ollama local. Vous collez l'URL de l'endpoint compatible OpenAI :
-http://localhost:11434/v1
-
-La clé API se laisse vide. Vous faites Connect et Hermes récupère la liste des modèles que vous avez téléchargés en local sur Ollama. Pour installer Ollama, il suffit d'aller sur le site officiel.
-
-À partir de là, il n'y a plus rien qui ne sort de votre PC. Le changement de modèle se fait ensuite en bas à droite, sans rien reconfigurer.
-
-Il faut un GPU récent comme une RTX 4090 ou RTX 5090 pour faire tourner un modèle capable d'appeler des outils rapidement. Il faut aussi changer le contexte à 65536 tokens dans Ollama, sinon Hermes refuse le modèle.
-
-## Le mode vocal
-
-Hermes intègre un mode vocal. Vous activez le micro, vous parlez, il transcrit et il exécute. J'ai testé avec la phrase Donne-moi la température à Paris aujourd'hui. La transcription est passée sans problème. On peut même dicter des ordres pour qu'il programme.
-
-## Mon avis sur Hermes Agent
-
-Je trouve que Hermes Agent tient ses promesses sur trois points : l'installation sous Windows se fait rapidement, les jobs planifiés fonctionnent et la passerelle Telegram transforme l'outil en assistant réellement utilisable au quotidien.
-
-Il faut payer une API ou avoir un bon GPU. La machine où l'on a installé Hermes Agent doit rester allumée en permanence. C'est pareil pour la machine où vous avez installé le LLM local. L'agent a la main sur votre système ce qui impose de régler les permissions avant de l'utiliser.
-
-## La vidéo d'installation et l'utilisation de Hermes Agent
-'''
-
-DONNÉES TECHNIQUES ET FAITS EXTRAITS DE L'EXPÉRIMENTATION :
-[RÈGLE CRUCIALE : Ces données constituent ta base factuelle. Ne raconte PAS la vidéo et ne commente pas l'écran ! Rédige un guide de synthèse thématique en suivant rigoureusement la structure ci-dessous.]
+DONNÉES FACTUELLES EXTRAITES DE LA TRANSCRIPTION :
+[RÈGLE CRUCIALE : Ces données constituent ta seule base factuelle. Ne raconte PAS la vidéo et ne commente pas l'écran. Rédige une synthèse thématique structurée et captivante.]
 {transcript_text}
 
 STRUCTURE DU RÉSULTAT DEMANDÉ (RESPECTE SCRUPULEUSEMENT CES DÉLIMITEURS) :
 
 ---SEO_METADATA---
-TITLE: [Titre H1 optimisé pour le SEO, 50 à 65 caractères, sans emoji, en casse de phrase]
-SLUG: [slug-url-optimise-sans-accents-separes-par-des-tirets]
-META_DESCRIPTION: [Meta description percutante de 145 à 160 caractères avec mot-clé principal, sans point-virgule]
-FOCUS_KEYWORD: [Mot-clé principal extrait de l'intention de recherche]
-SECONDARY_KEYWORDS: [3 à 5 mots-clés secondaires LSI séparés par des virgules]
+TITLE: [Titre H1 optimisé pour le SEO, 50 à 75 caractères, sans emoji, en casse de phrase, complet et sans parenthèse coupée]
+SLUG: [slug-url-optimise-avec-tirets]
+META_DESCRIPTION: [Meta description captivante entre 145 et 160 caractères avec mot-clé principal et incitation au clic, sans point-virgule]
+FOCUS_KEYWORD: [Mot-clé principal]
+SECONDARY_KEYWORDS: [3 à 5 mots-clés secondaires séparés par des virgules]
 ---END_SEO_METADATA---
 
 ---ARTICLE_CONTENT---
-# [Titre H1 de l'article en casse de phrase, 50-65 caractères, sans emoji]
+# [Titre H1 de l'article, 50-75 caractères, sans emoji, complet]
 
-[Introduction directe et incarnée : annonce claire du sujet et retour d'expérience vécu ("Je l'ai installé de bout en bout sur mon PC..."). 2 paragraphes denses et rythmés.]
+[Introduction directe et captivante : annonce claire du sujet, enjeux concrets et promesse de l'article en 2 paragraphes denses et rythmés.]
 
-## Hermes Agent, qu'est-ce que c'est ?
-[Présentation de l'agent développé par Nous Research, licence MIT, versions terminal et desktop pour Windows 10/11, macOS, Linux.]
+## [Titre H2 de la première section thématique adapté au sujet réel]
+[Contenu détaillé, précis et factuel tiré de la transcription, avec explications claires et exemples concrets.]
 
-## Ce qui le distingue d'un simple LLM sans agent
-[Les points clés sous forme de liste à tirets : accès système de fichiers, navigation web autonome, persistance du contexte, compétences skills, serveur permanent, pilotage en ligne de commande et messageries.]
+## [Titre H2 de la deuxième section thématique adapté au sujet réel]
+[Développement approfondi des règles, méthodes ou principes expliqués dans la transcription.]
 
-## Télécharger et installer Hermes Agent sur Windows
-[Étapes claires : téléchargement sur hermes-agent.nousresearch.com, installation silencieuse dans %LOCALAPPDATA%\\hermes sans droits admin (Git, Node.js, Python isolés et venv automatique), bouton Launch.]
+## [Titre H2 de la troisième section thématique adapté au sujet réel]
+[Conseils pratiques, pièges à éviter, exceptions et cas concrets.]
 
-## Connecter un modèle à Hermes Agent
-[Nous Portal payant vs option I have an API key (OpenAI, Anthropic Claude, Qwen, NVIDIA gratuite), retour d'expérience sur les quotas de requêtes qui bloquent les offres gratuites comme Kimi, et impératif des 64 000 tokens de contexte.]
+## [Titre H2 de la quatrième section thématique adapté au sujet réel]
+[Analyse approfondie ou mise en pratique détaillée.]
 
-## Régler l'interface et découvrir les skills
-[Roue crantée des préférences : passage au thème sombre, disposition des panneaux. Catalogue Capabilities : descriptions courtes en mémoire et chargement complet à la demande, exemple du skill Home Assistant.]
-
-## Premiers tests concrets
-[Sous-points denses et précis : Créer un jeu (morpion codé et exécuté), Chercher un billet d'avion (Paris-Tokyo septembre 2026, contournement d'erreur Chrome), Faire un graphique (températures Paris août 2026 en HTML sauvegardé sur disque, export PNG/PDF), Interroger la machine (espace disque C, 128 Go RAM et deux GPU : RTX 4090 + puce intégrée carte mère), avertissement et réglage des permissions.]
-
-## Créer des jobs automatiques
-[Planificateur en langage naturel sans crontab : résumé quotidien à 6h des articles du site paradoxetemporel.fr, veille vols Paris-Tokyo < 600€ toutes les 5h, prérequis machine allumée (PC, mini-PC, VPS avec 4 Go RAM min).]
-
-## Recevoir les résultats sur Telegram
-[Passerelle multi-messagerie (Telegram, Discord, Slack, etc.) : sorties ciné du mercredi avec titre, genre, résumé sur smartphone, et communication bidirectionnelle (commande envoyée depuis le smartphone avec réponse directe sur Telegram).]
-
-## Passer Hermes Agent en local avec Ollama
-[Confidentialité totale des données : Provider > Account > auto-hébergé Ollama local sur http://localhost:11434/v1, clé vide, GPU récent, réglage impératif du contexte à 65536 tokens dans Ollama.]
-
-## Le mode vocal
-[Micro activé, dictée vocale sans syntaxe particulière ("Donne-moi la température à Paris aujourd'hui"), transcription et exécution d'ordres pour programmer.]
-
-## Mon avis sur Hermes Agent
-[Bilan franc sur trois points forts (installation rapide, jobs planifiés, passerelle Telegram) et contraintes (machine allumée en continu, bon GPU ou API payante, permissions à paramétrer).]
-
-## La vidéo d'installation et l'utilisation de Hermes Agent
-[Courte présentation invitant à visionner la vidéo complète ci-dessous pour voir toutes les étapes en direct.]
+## Ce qu'il faut retenir
+[Synthèse percutante avec les points clés essentiels à mémoriser pour le lecteur, sans formule générique de conclusion.]
 ---END_ARTICLE_CONTENT---
 
 ---IMAGE_PROMPTS---
-IMAGE_1: [Prompt en anglais pour l'image à la une / Featured Image, style moderne photoréaliste ou illustration tech]
-IMAGE_2: [Prompt en anglais pour illustrer la section configuration technique]
-IMAGE_3: [Prompt en anglais pour illustrer les fonctionnalités d'automatisation avancée]
+IMAGE_1: [Prompt en anglais pour l'image à la une / Featured Image, style moderne photoréaliste ou illustration éditoriale en lien direct avec le sujet]
+IMAGE_2: [Prompt en anglais pour illustrer la deuxième section thématique]
+IMAGE_3: [Prompt en anglais pour illustrer la section conseils et cas pratiques]
 ---END_IMAGE_PROMPTS---
 """
         else: # English & generic (Humanizer 35-Pattern Benchmark)
             system_prompt = (
                 f"You are a seasoned tech journalist and senior technical writer writing in {lang_name} (style of Ars Technica, The Verge).\n"
-                "Your objective is to craft an authoritative, highly engaging, and hands-on SEO blog post based on real demonstration facts.\n\n"
-                "FIRST-PERSON INCARNATED TESTER VOICE (MANDATORY RULE):\n"
-                "- You are the hands-on practitioner who tested and deployed this tool on your own PC. Use an authentic first-person voice ('I tested it on my Windows workstation...', 'In my tests, I asked it to...') combined with 'You' to guide the reader step-by-step.\n"
-                "- Write a native written web tutorial. You NEVER comment on a video or third-party presenter!\n"
-                "- STRICTLY FORBIDDEN: Oral screen-commentary phrases like 'Now I show you', 'Here it is searching in fast-forward', 'I clicked on Close', 'I stopped the prompt'. Write a clean, thematic written guide!\n"
-                "- STRICTLY FORBIDDEN phrases: 'the video explains', 'the video shows', 'in this video', 'the author mentions', 'the creator explains', 'the presenter', 'as seen in the video', 'as shown on screen'.\n"
-                "- STRICTLY FORBIDDEN: Calls to like, subscribe, share, ring the bell, leave a comment, or check the description. You are writing an authoritative blog post, NOT a YouTube script.\n\n"
+                "Your objective is to craft an authoritative, highly engaging, and hands-on SEO blog post based on real facts from the transcript.\n\n"
+                "EDITORIAL VOICE:\n"
+                "- Write an engaging web tutorial or analysis adapted to the requested style.\n"
+                "- You NEVER comment on a video or third-party presenter!\n"
+                "- STRICTLY FORBIDDEN: Oral screen-commentary phrases like 'Now I show you', 'In this video', 'The presenter explains', 'As seen on screen'. Write a clean, thematic written guide!\n"
+                "- STRICTLY FORBIDDEN: Calls to like, subscribe, share, ring the bell, or leave a comment.\n\n"
                 "STRICT HUMANIZER ANTI-AI RULES:\n"
                 "1. ABSOLUTE BAN ON SEMICOLONS (;): Do NOT use semicolons in prose. Write crisp, punchy sentences separated by simple periods (.).\n"
                 "2. NO EM DASHES (— or –) in prose: Use commas, colons, or parentheses.\n"
                 "3. NO HEADING EMOJIS: Headings H1, H2, H3 must be clean and professional, with zero emojis.\n"
-                "4. SEO TITLE CALIBRATION: Strictly 50 to 65 characters in sentence case.\n"
-                "5. ZERO HYPE OR BUZZWORDS: Avoid 'groundbreaking', 'game changer', 'pivotal moment', 'testament to'. Keep it measured and factual.\n"
-                "6. ZERO GENERIC INTROS OR OUTROS: No 'In this article we will explore'. No 'In conclusion'. Use an action-driven heading like 'My Verdict: Who Is This For?'."
+                "4. SEO TITLE CALIBRATION: Strictly 50 to 75 characters in sentence case, complete and without dangling punctuation.\n"
+                "5. ZERO HYPE OR BUZZWORDS: Avoid 'groundbreaking', 'game changer', 'pivotal moment'. Keep it measured and factual.\n"
+                "6. ZERO GENERIC INTROS OR OUTROS: No 'In this article we will explore'. No 'In conclusion'. Use an action-driven heading like 'Key Takeaways'."
             )
 
-            user_prompt = f"""Write an exceptional, comprehensive SEO blog post based on the following technical context.
+            user_prompt = f"""Write an exceptional, comprehensive SEO blog post based on the following context.
 
 TOPIC INFORMATION:
 - Primary Topic: {video_title or 'Hands-on Technical Guide & Tutorial'}
-- Scope: In-depth technical walkthrough and real-world test cases
 - Writing Style: {style} -> {style_prompt}
 - Target Length: ~{target_words} words
 - Target Language: {lang_name}
 - {kw_instruction_en}
 
-TECHNICAL CONTEXT & RECORDED FACTS:
-[Crucial note: You are the hands-on practitioner writing your own tutorial. Use these technical facts, but NEVER narrate a video or refer to 'the video', 'in this video', or 'the author'. Synthesize into the 5 thematic sections below.]
+FACTUAL CONTEXT & RECORDED DATA:
+[Crucial note: Use these facts strictly from the transcript, but NEVER narrate a video or refer to 'the video', 'in this video', or 'the author'. Synthesize into the thematic sections below.]
 {transcript_text}
 
 OUTPUT STRUCTURE REQUIRED:
 You must strictly provide the response using these delimiters:
 
 ---SEO_METADATA---
-TITLE: [High-CTR SEO Title H1, 50-65 characters, sentence case, no emoji]
+TITLE: [High-CTR SEO Title H1, 50-75 characters, sentence case, no emoji, complete]
 SLUG: [optimized-hyphenated-url-slug]
 META_DESCRIPTION: [Compelling Meta Description between 145 and 160 characters with focus keyword and clear CTA, no semicolons]
 FOCUS_KEYWORD: [Primary keyword]
@@ -929,30 +811,27 @@ SECONDARY_KEYWORDS: [3 to 5 secondary keywords separated by commas]
 ---END_SEO_METADATA---
 
 ---ARTICLE_CONTENT---
-# [Title H1, 50-65 chars, no emoji]
+# [Title H1, 50-75 chars, no emoji, complete]
 
-[Engaging first-person hook delivering instant value without generic preamble. 2 dense paragraphs.]
+[Engaging hook delivering instant value without generic preamble. 2 dense paragraphs.]
 
-## What It Is and How It Outperforms Web Chatbots
-[In-depth breakdown of persistent memory, file system access, modular skills, and background cron execution.]
+## [Thematic Section 1 Heading adapted to the actual topic]
+[In-depth breakdown of the primary principles, core context, or fundamental concepts.]
 
-## System Requirements: What You Actually Need
-[Clear realistic prerequisites (4 GB RAM minimum for remote APIs vs local Ollama requiring 16 GB RAM and 64,000 token context window).]
+## [Thematic Section 2 Heading adapted to the actual topic]
+[Actionable breakdown, detailed rules, or technical walkthrough.]
 
-## Step-by-Step Installation on Windows
-[Step by step guidance: installer in %LOCALAPPDATA%\\hermes, zero admin rights needed, API and Ollama configuration.]
+## [Thematic Section 3 Heading adapted to the actual topic]
+[Key strategies, common pitfalls to avoid, and practical advice.]
 
-## Real-World Automations: Games, Cron Jobs & Telegram
-[In-depth real test cases: interactive tic-tac-toe game, flight alerts under 600€, Wednesday movie summaries, drive C inspection, and Telegram bot mobile control.]
-
-## My Verdict: Who Is This For?
-[Impactful takeaway and hardware recommendations (mini-PC vs always-on desktop) without writing 'In Conclusion' and without any YouTube outro formulas.]
+## Key Takeaways
+[Impactful summary of essential points without writing 'In Conclusion' and without any YouTube outro formulas.]
 ---END_ARTICLE_CONTENT---
 
 ---IMAGE_PROMPTS---
-IMAGE_1: [AI Image prompt for Featured Header image in English, photorealistic or modern tech vector]
+IMAGE_1: [AI Image prompt for Featured Header image in English, photorealistic or editorial illustration directly related to the topic]
 IMAGE_2: [AI Image prompt for Section 2 in English]
-IMAGE_3: [AI Image prompt for Section 4 in English]
+IMAGE_3: [AI Image prompt for Section 3 in English]
 ---END_IMAGE_PROMPTS---
 """
 

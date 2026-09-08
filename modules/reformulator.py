@@ -15,12 +15,37 @@ class Reformulator:
         self.llm = None
 
     def load_model(self):
-        if self.llm is None or self.llm.name != self.backend_name:
-            self.llm = get_backend(self.backend_name)
-            self.llm.load()
+        if self.llm is not None:
+            if hasattr(self.llm, "is_loaded") and self.llm.is_loaded():
+                return
+            if getattr(self.llm, "_backend", None) is not None:
+                return
+            if getattr(self.llm, "model", None) is not None:
+                return
+        self.llm = get_backend(self.backend_name)
+        self.llm.load()
 
     def _language_name(self, lang_code):
-        """Convert language code to human-readable name."""
+        """Convert language code or full name to human-readable English name."""
+        if not lang_code:
+            return "Unknown"
+        code = str(lang_code).strip().lower()
+        names = {
+            "french": "French", "english": "English", "spanish": "Spanish",
+            "german": "German", "italian": "Italian", "portuguese": "Portuguese",
+            "japanese": "Japanese", "korean": "Korean", "chinese": "Chinese",
+            "russian": "Russian", "arabic": "Arabic", "hindi": "Hindi",
+            "dutch": "Dutch", "polish": "Polish", "turkish": "Turkish",
+            "swedish": "Swedish", "czech": "Czech", "romanian": "Romanian",
+            "hungarian": "Hungarian", "burmese": "Burmese", "danish": "Danish",
+            "finnish": "Finnish", "greek": "Greek", "hebrew": "Hebrew",
+            "indonesian": "Indonesian", "khmer": "Khmer", "lao": "Lao",
+            "malay": "Malay", "norwegian": "Norwegian", "swahili": "Swahili",
+            "tagalog": "Tagalog", "thai": "Thai", "vietnamese": "Vietnamese"
+        }
+        if code in names:
+            return names[code]
+
         name_map = {
             "fra": "French", "eng": "English", "spa": "Spanish",
             "deu": "German", "ita": "Italian", "por": "Portuguese",
@@ -46,26 +71,13 @@ class Reformulator:
             "tl": "Tagalog", "th": "Thai", "vi": "Vietnamese"
         }
         for prefix, name in name_map.items():
-            if lang_code.startswith(prefix):
+            if code.startswith(prefix):
                 return name
         return "Unknown"
 
     def _source_language_name(self, lang_code):
-        """Get source language name from Whisper-style codes."""
-        short_map = {
-            "fr": "French", "en": "English", "es": "Spanish",
-            "de": "German", "it": "Italian", "pt": "Portuguese",
-            "ja": "Japanese", "ko": "Korean", "zh": "Chinese",
-            "ru": "Russian", "ar": "Arabic", "hi": "Hindi",
-            "nl": "Dutch", "pl": "Polish", "tr": "Turkish",
-            "sv": "Swedish", "cs": "Czech", "ro": "Romanian",
-            "hu": "Hungarian", "my": "Burmese", "da": "Danish",
-            "fi": "Finnish", "el": "Greek", "he": "Hebrew",
-            "id": "Indonesian", "km": "Khmer", "lo": "Lao",
-            "ms": "Malay", "no": "Norwegian", "sw": "Swahili",
-            "tl": "Tagalog", "th": "Thai", "vi": "Vietnamese"
-        }
-        return short_map.get(lang_code, "Unknown")
+        """Get source language name from Whisper-style codes or full names."""
+        return self._language_name(lang_code)
 
     def _generate(self, messages, max_new_tokens=120, multiline=False):
         """Run LLM generation with standard settings."""
@@ -163,7 +175,7 @@ ABSOLUTE RULES:
 
 {tgt_name}:"""
         messages = [
-            {"role": "system", "content": f"You are a video dubbing translator. Translate from {src_name} to {tgt_name} as BRUTALLY CONCISE as possible to fit in {duration:.1f}s. MAX {max_chars} characters. Output: ONLY the {tgt_name} translation."},
+            {"role": "system", "content": f"You are an expert video dubbing translator. Translate from {src_name} to {tgt_name} as BRUTALLY CONCISE as possible to fit timing constraints. Output: ONLY the {tgt_name} translation."},
             {"role": "user", "content": prompt}
         ]
         return messages, max(15, int(max_chars * 1.2))
@@ -199,7 +211,7 @@ ABSOLUTE RULES:
 {tgt_name}:"""
 
             messages = [
-                {"role": "system", "content": f"You are a video dubbing translator. Translate from {src_name} to {tgt_name} as BRUTALLY CONCISE as possible to fit in {duration:.1f}s. MAX {max_chars} characters. Output: ONLY the {tgt_name} translation."},
+                {"role": "system", "content": f"You are an expert video dubbing translator. Translate from {src_name} to {tgt_name} as BRUTALLY CONCISE as possible to fit timing constraints. Output: ONLY the {tgt_name} translation."},
                 {"role": "user", "content": prompt}
             ]
             
@@ -241,11 +253,19 @@ ABSOLUTE RULES:
         Uses GPU-batched inference (BATCH_SIZE=8) for ~5-8x speedup on 4090.
         Failed/overflowed segments are retried individually.
         """
-        self.load_model()
-        
         tgt_name = self._language_name(target_lang_code)
         src_name = self._source_language_name(source_lang)
         same_lang = (src_name == tgt_name)
+        
+        if same_lang:
+            print(f"Same language ({src_name} -> {tgt_name}): preserving 100% authentic transcription.")
+            for seg in segments:
+                text = seg.get("text", "").strip()
+                seg["translated_text"] = text
+                seg["normal_text"] = text
+            return segments
+
+        self.load_model()
         
         BATCH_SIZE = 8
         print(f"LLM Translation -> {tgt_name} ({len(segments)} segments, batch={BATCH_SIZE}, CPS={cps})...")
@@ -271,7 +291,9 @@ ABSOLUTE RULES:
                 max_chars = int(duration * aggressive_cps * speed_factor)
 
                 if same_lang:
-                    seg["translated_text"] = text if len(text) <= max_chars * 1.1 else text[:max_chars]
+                    # In same-language mode (e.g. French -> French), preserve the complete text intact.
+                    # Never brutally slice strings mid-word! Phase 2 (shorten_batch) will grammatically shorten overflowing segments if needed.
+                    seg["translated_text"] = text
                     continue
 
                 msgs, mnt = self._build_translate_messages(text, source_lang, target_lang_code, duration, max_chars)
@@ -347,11 +369,16 @@ Source: "{text}"
         Stores result in 'normal_text' key of each segment.
         Uses GPU-batched inference (BATCH_SIZE=8) matching translate_segments.
         """
-        self.load_model()
-        
         src_name = self._source_language_name(source_lang)
         tgt_name = self._language_name(target_lang_code)
         same_lang = (src_name == tgt_name)
+
+        if same_lang:
+            for seg in segments:
+                seg["normal_text"] = seg.get("text", "").strip()
+            return segments
+
+        self.load_model()
         BATCH_SIZE = 8
         print(f"Normal Translation -> {tgt_name} ({len(segments)} segments, batch={BATCH_SIZE}, natural/full)...")
         
@@ -438,26 +465,41 @@ Source: "{text}"
 
 Rules:
 - Output ONLY the shortened sentence in {lang_name}
-- Must be grammatically correct and natural
+- Must be grammatically complete, natural, and make sense as a spoken subtitle
 - Keep the same meaning
-- Remove fillers, use shorter forms ("nous allons" → "on")
+- Remove filler words, use natural shorter phrasing
+- NEVER abbreviate words into incomplete non-words (NEVER write "unq.", "gouvern.", "maj."). Every word MUST be a real, full dictionary word.
 - Do NOT translate to another language
 
 {examples}Sentence ({len(text)} chars): {text}
 Shortened ({target_chars} chars max):"""
 
         messages = [
-            {"role": "system", "content": f"You shorten {lang_name} sentences. Remove filler words. Keep meaning. Output ONLY the result."},
+            {"role": "system", "content": f"You shorten {lang_name} subtitles into concise, natural, complete sentences. Never cut words or use abbreviations. Output ONLY the result."},
             {"role": "user", "content": prompt}
         ]
         
         result = self._generate(messages, max_new_tokens=min(80, len(text)))
         
-        # Validation
+        # Validation: reject empty, longer, or truncated abbreviation words
         if not result or len(result) < 3 or len(result) >= len(text):
             return None
         if len(result) > target_chars * 1.3:
             return None
+        
+        # Reject if numbers were present in original text but completely omitted in result
+        if re.search(r'\d+', text) and not re.search(r'\d+', result):
+            return None
+
+        # Reject if any word (including the last one) is an obvious truncated non-word or clipped month/word
+        bad_words = {"unq", "unq.", "gouvern", "gouvern.", "maj", "maj.", "nov", "nov.", "dec", "déc.", "janv", "janv.", "févr", "févr."}
+        words_res = result.strip().split()
+        for w in words_res:
+            w_clean = w.lower().rstrip(',;:')
+            if w_clean in bad_words:
+                return None
+            if w.endswith(".") and len(w) > 2 and w_clean not in ["etc.", "m.", "mme.", "dr.", "st."] and w != words_res[-1]:
+                return None
         
         return result
 
@@ -504,16 +546,17 @@ Shortened ({target_chars} chars max):"""
 
 Rules:
 - Output ONLY the shortened sentence in {lang_name}
-- Must be grammatically correct and natural
+- Must be grammatically complete, natural, and make sense as a spoken subtitle
 - Keep the same meaning
-- Remove fillers, use shorter forms ("nous allons" → "on")
+- Remove filler words, use natural shorter phrasing
+- NEVER abbreviate words into incomplete non-words (NEVER write "unq.", "gouvern.", "maj."). Every word MUST be a real, full dictionary word.
 - Do NOT translate to another language
 
 {examples}Sentence ({len(text)} chars): {text}
 Shortened ({target_chars} chars max):"""
 
                 messages = [
-                    {"role": "system", "content": f"You shorten {lang_name} sentences. Remove filler words. Keep meaning. Output ONLY the result."},
+                    {"role": "system", "content": f"You shorten {lang_name} subtitles into concise, natural, complete sentences. Never cut words or use abbreviations. Output ONLY the result."},
                     {"role": "user", "content": prompt}
                 ]
                 batch_messages.append(messages)
@@ -546,9 +589,24 @@ Shortened ({target_chars} chars max):"""
                         and len(result) <= target_chars * 1.3
                     )
 
+                    if is_valid:
+                        if re.search(r'\d+', text) and not re.search(r'\d+', result):
+                            is_valid = False
+
+                    if is_valid:
+                        bad_words = {"unq", "unq.", "gouvern", "gouvern.", "maj", "maj.", "nov", "nov.", "dec", "déc.", "janv", "janv.", "févr", "févr."}
+                        words_res = result.strip().split()
+                        for w in words_res:
+                            w_clean = w.lower().rstrip(',;:')
+                            if w_clean in bad_words:
+                                is_valid = False
+                                break
+                            if w.endswith(".") and len(w) > 2 and w_clean not in ["etc.", "m.", "mme.", "dr.", "st."] and w != words_res[-1]:
+                                is_valid = False
+                                break
+
                     if not is_valid:
-                        # Fallback to single-item retry
-                        result = self.shorten(text, target_chars, language)
+                        result = None
 
                     sub_results[sub_idx] = result if (result and len(result) < len(text)) else None
 
@@ -570,9 +628,11 @@ Shortened ({target_chars} chars max):"""
         """Translate a generic text (like a video title or description)."""
         if not text or not text.strip():
             return ""
-        self.load_model()
         target_lang = self._language_name(target_lang_code)
         source_lang = self._source_language_name(source_lang_code)
+        if source_lang == target_lang:
+            return text
+        self.load_model()
         
         messages = [
             {
