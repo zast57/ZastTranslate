@@ -1,6 +1,6 @@
 module.exports = {
   version: "5.0",
-  title: "ZastTranslate — Beta 1.20",
+  title: "ZastTranslate — Beta 1.21",
   description: "Video translation & dubbing with voice cloning — 100% local, zero API. Supports 30 languages (VoxCPM 2), YouTube SEO Studio, Viral Shorts Studio (9:16), and WordPress SEO Blog Post Generator.",
   icon: "zastttranslate.png",
   menu: async (kernel, info) => {
@@ -10,7 +10,9 @@ module.exports = {
       start: info.running("start.js"),
       update: info.running("update.js"),
       reset: info.running("reset.js"),
-      flux_install: info.running("flux_install.js")
+      clean_cache: info.running("clean_cache.js"),
+      clean_output: info.running("clean_output.js"),
+      qwen_image_install: info.running("qwen_image_install.js")
     }
     if (running.install) {
       return [{
@@ -19,12 +21,26 @@ module.exports = {
         text: "Installing",
         href: "install.js",
       }]
-    } else if (running.flux_install) {
+    } else if (running.qwen_image_install) {
       return [{
         default: true,
-        icon: "fa-solid fa-wand-magic-sparkles",
-        text: "Installing FLUX",
-        href: "flux_install.js",
+        icon: "fa-solid fa-palette",
+        text: "Installing Qwen-Image",
+        href: "qwen_image_install.js",
+      }]
+    } else if (running.clean_cache) {
+      return [{
+        default: true,
+        icon: "fa-solid fa-broom",
+        text: "Cleaning Cache",
+        href: "clean_cache.js",
+      }]
+    } else if (running.clean_output) {
+      return [{
+        default: true,
+        icon: "fa-solid fa-trash-can",
+        text: "Cleaning Output",
+        href: "clean_output.js",
       }]
     } else if (installed) {
       if (running.start) {
@@ -69,9 +85,17 @@ module.exports = {
           text: "Start",
           href: "start.js"
         }, {
-          icon: "fa-solid fa-wand-magic-sparkles",
-          text: "Install FLUX (Optional)",
-          href: "flux_install.js"
+          icon: "fa-solid fa-palette",
+          text: "Install Qwen-Image (Optional - 8GB+ VRAM)",
+          href: "qwen_image_install.js"
+        }, {
+          icon: "fa-solid fa-broom",
+          text: "Clean Cache (Temp)",
+          href: "clean_cache.js"
+        }, {
+          icon: "fa-solid fa-trash-can",
+          text: "Clean Output (Exported Videos & Audio)",
+          href: "clean_output.js"
         }, {
           icon: "fa-solid fa-sync",
           text: "Update",

@@ -2,15 +2,15 @@
   <img src="zastttranslate.png" alt="ZastTranslate" width="128" />
 </p>
 
-# ZastTranslate — Beta 1.20
+# ZastTranslate — Beta 1.21
 
 **1-click video translation & dubbing for [Pinokio](https://pinokio.computer)** — 100% local, AI voice cloning, zero API keys.
 
-> ℹ️ **Beta 1.20**: **Quadruple Acceleration Architecture (Zero Quality Loss)**:
-> 1. ⚡ **VoxCPM 2 Voice Embedding Caching**: Eliminates redundant ZipEnhancer neural denoising (~1.5s) and audio feature encoding (~1.0s) across all segments, accelerating audio dubbing generation while keeping voice synthesis 100% identical.
-> 2. 🚀 **NVIDIA NVENC Hardware Video Encoding (`h264_nvenc`)**: Accelerated FFmpeg video assembly with NVENC hardware acceleration (preset `p6`, cq `20`) with seamless CPU fallback (`libx264`).
-> 3. 🧠 **C++ Inference Engine (GGUF / `llama-cpp-python`)**: Native C++ execution for Qwen GGUF models with complete GPU offload and automatic Windows CUDA DLL resolution.
-> 4. ⚡ **Prompt Caching (KV Cache)**: System prompt prefix KV caching across translation and reformulation batches, eliminating redundant prefix evaluation.
+> ℹ️ **Beta 1.21**: **Qwen-Image-2.1 Integration & Native RGBA Transparency Studio (100% Optional)**:
+> 1. ⚡ **Qwen-Image-2.1 SOTA Architecture**: Unified 7B single-stream DiT model combining Text-to-Image, Reference Image editing, and native RGBA transparency.
+> 2. 🪟 **Native RGBA Alpha Channel**: Generates transparent stickers, overlays, and graphics without external background removal tools.
+> 3. 🧪 **YouTube Studio A/B Testing Pack**: Generates 3 distinct high-CTR visual variants bundled into a 1-click ZIP archive.
+> 4. 🛡️ **100% Non-Blocking & Optional**: Core translation and voice cloning remain ultra-lightweight; Qwen-Image-2.1 (~30 GB) is only downloaded when explicitly requested.
 > Tested on **Windows only**.
 
 Translate any video into 33 languages with natural-sounding dubbed audio. Optionally clone the original speaker's voice for seamless dubbing. Everything runs locally on your machine — no cloud, no subscriptions.
@@ -21,18 +21,19 @@ Watch the complete step-by-step walkthrough to see ZastTranslate in action, from
 
 <p align="center">
   <a href="https://youtu.be/M0JQYwzlEfU" target="_blank">
-    <img src="https://img.youtube.com/vi/M0JQYwzlEfU/maxresdefault.jpg" alt="Tuto : Comment doubler une vidéo avec sa propre voix gratuitement (IA en local) avec ZastTranslate" width="720" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+    <img src="https://img.youtube.com/vi/M0JQYwzlEfU/maxresdefault.jpg" alt="Tutorial: How to dub any video with your own voice for free (local AI) with ZastTranslate" width="720" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
   </a>
   <br />
-  <b>▶️ <a href="https://youtu.be/M0JQYwzlEfU" target="_blank">Tuto : Comment doubler une vidéo avec sa propre voix gratuitement (IA en local) avec ZastTranslate (YouTube)</a></b>
+  <b>▶️ <a href="https://youtu.be/M0JQYwzlEfU" target="_blank">Tutorial: How to dub any video with your own voice for free (local AI) with ZastTranslate (YouTube)</a></b>
 </p>
 
 ## Features
 
-- 💡 **Per-Tab Quick Guides & Options Explorer**: Dedicated collapsible guides embedded at the top of each of the 7 tabs explaining Goal, key options/models, and exact step-by-step click order — 100% in English with zero screen-blocking popups.
+- 💡 **Per-Tab Quick Guides & Options Explorer**: Dedicated collapsible guides embedded at the top of each of the 8 tabs explaining Goal, key options/models, and exact step-by-step click order — 100% in English with zero screen-blocking popups.
 - 🎬 **Input**: YouTube URL (with resolution picker), local video, or local audio file (MP3, WAV, etc.)
 - 🎙️ **Transcription**: WhisperX with word-level forced alignment & **8-step subtitle stabilization** (zero 1-word orphan cues, sentence fragment & anti-dangling merging, strictly monotonic non-overlapping timecodes with 40ms gaps, intelligent inter-cue continuation lowercasing, English "I" and German noun capitalization preservation, and cross-cue phonetic term restoration via a 222-rule domain dictionary)
-- 📝 **SEO Blog & WordPress Studio**: Turn any video into a natural, anti-AI blog article (in any language), with tone & style presets, Meta Description, URL slug, **1080p/2K HD keyframe extraction with Lanczos scaling and text/code sharpening**, and ready-to-copy Gutenberg Block HTML & Markdown.
+- 📝 **SEO Blog & WordPress Studio (Tab 7)**: Turn any video into a natural, anti-AI blog article (in any language), with tone & style presets, Meta Description, URL slug, **1080p/2K HD keyframe extraction with Lanczos scaling and text/code sharpening**, and ready-to-copy Gutenberg Block HTML & Markdown.
+- 🎨 **AI Thumbnail & Visuals Studio (Tab 8 — Qwen-Image-2.1 — Optional)**: Dedicated top-level generative AI studio powered by Alibaba's unified 7B DiT model for creating high-CTR 16:9 / 9:16 YouTube thumbnails with 3D typography, reference-conditioned face/product editing, native RGBA transparency (stickers & cutouts), and 1-click 3-variant A/B testing packs with 100% stripped AI metadata.
 - 📱 **Viral Shorts Studio**: Select from 1 to 5 viral moments, preview sequences in the player, customize burned subtitles, and render to vertical 9:16 (1080x1920) with stacked blur & TikTok karaoke dynamic captions.
 - 🌍 **Multi-Backend Translation**: Choose between Qwen2.5-7B, Qwen3.5-9B, or EuroLLM-9B
 - 🗣️ **Voice Synthesis**: Powered by **VoxCPM 2** — 30 languages, per-language CPS calibration, with a dynamic factory ready to accept future engines.
@@ -77,11 +78,11 @@ The Left Column provides interactive controls that sync with your workflow tabs:
 
 ### 💡 Embedded Per-Tab Quick Guides & Options Explorer
 
-Each of the 7 tabs in ZastTranslate includes a built-in, collapsible header: `💡 Quick Guide & Options Explained (Tab X) ▾`.
+Each of the 8 tabs in ZastTranslate includes a built-in, collapsible header: `💡 Quick Guide & Options Explained (Tab X) ▾`.
 - **Zero Overlay / Popups**: Unlike disruptive spotlight tours that lock your screen or fail during automated tab switching, these guides live directly within each tab's native layout.
 - **3 Structured Cards**:
   1. **🎯 Goal**: Concise summary of what the current screen accomplishes.
-  2. **⚙️ Key Options & Settings**: Plain-English explanations of all dropdowns, checkboxes, and model selections (`base` vs `large-v3`, *Normal* vs *Fitted* translation, voice cloning modes, 9:16 crop styles, etc.).
+  2. **⚙️ Key Options & Settings**: Plain-English explanations of all dropdowns, checkboxes, and model selections (`base` vs `large-v3`, *Normal* vs *Fitted* translation, voice cloning modes, 9:16 crop styles, Qwen-Image presets, etc.).
   3. **👉 Where to Click**: Numbered step-by-step instructions specifying the exact buttons to press and the optimal execution order.
 - **Collapsible on Demand**: Kept closed by default to preserve editing real estate, and smoothly expand with a single click.
 
@@ -315,20 +316,57 @@ Transform any transcribed video into a **complete, human-sounding, SEO-optimized
    - **Automatic High-Res Source Discovery**: Automatically detects and uses higher-resolution video candidates in `temp/` if the active project video is low-res.
    - **Maximum JPEG Quality**: Uses `-q:v 1` for lossless-like JPEG visual clarity.
    - **Live Dimension Tags**: Displays exact dimensions (e.g. `1920x1080`) directly on each keyframe card and embeds resolution metadata in `seo_metadata.json`.
-7. **⚡ Studio Redesign & Generative AI Thumbnails (FLUX.1-schnell — Optional)**:
-   - **Spacious 3-Sub-Tab Layout**: Tab 7 is cleanly separated into 3 full-width dedicated workspaces: `📄 1. Article & SEO Metadata`, `📸 2. Extracted Video Keyframes`, and `⚡ 3. YouTube Thumbnail Studio (FLUX.1-schnell)`.
-   - **🧪 1-Click YouTube A/B Testing Studio (3 Diverse High-CTR Variants)**: Generate 3 distinct thumbnail visual angles in a single click ready for YouTube Studio's *'Test & Compare'* feature:
-     - **🅰️ Variant A (Viral High-CTR)**: Electric cyan and warm amber neon lighting, bold 3D typography, high emotional hook.
-     - **🅱️ Variant B (3D Tech Glow)**: Futuristic 3D isometric scene, glassmorphism, modern tech gradients.
-     - **🅲 Variant C (Cinematic Studio)**: Photorealistic 85mm f/1.8 shallow depth-of-field studio shot with dramatic golden rim lighting.
-     - **📦 1-Click ZIP Pack**: Packages all 3 sanitized PNGs with a `README_YOUTUBE_AB_TEST.txt` guide for immediate drag-and-drop into YouTube Studio.
-     - **⭐ 1-Click Apply**: Easily select any of the 3 variants as the main thumbnail (#1) for your blog and video project.
-   - **⚡ Generative AI Thumbnails (FLUX.1-schnell)**: Ultra-fast 4-step distilled generation (~2s on RTX 4090) with world-class typography and text rendering, 16:9 (`1280x720`), 9:16, and 1:1 aspect ratios, and **optional reference photo input (face / product / capture)**.
-   - **🛡️ Anti-AI Detection Metadata Sanitizer**: Automatically purges all generation metadata (EXIF tags, PNG `tEXt`/`zTXt`/`iTXt` chunks, prompts, model identifiers, diffusers signatures, C2PA) on save, reconstructing images from raw pixel buffers so they appear 100% human-crafted (like Adobe Photoshop or camera exports).
-   - **💡 Interactive AI Prompt Assistant**: Select from 5 curated style presets (*YouTube Viral High-CTR*, *3D Isometric & Tech Glow*, *Cyberpunk & Bold Neon*, *Minimalist SaaS*, *Photorealistic Studio*) and automatically generate prompts with quoted 3D typography for exact text rendering.
-   - **📥 Ungated 1-Click Pinokio Installer**: Fully optional module with dedicated Pinokio launcher (`flux_install.js`) and direct ungated model mirror support, completely bypassing Hugging Face 403 gated access restrictions.
-   - **Media Package**: Drag-and-drop custom visuals into the 6 interactive keyframe slots, access local image files in 1-click (`📂 Open Images Folder in Windows Explorer`), and export all assets in `blog_pack_wordpress.zip`.
-8. **📋 1-Click WordPress Gutenberg & Markdown Export**: Outputs standard Markdown and 100% native Gutenberg HTML comments (`<!-- wp:heading -->`, `<!-- wp:paragraph -->`, `<!-- wp:list -->`, `<!-- wp:quote -->`, `<!-- wp:code -->`) ready to paste directly into the WordPress Code Editor. All assets are packaged into `blog_pack_wordpress.zip`.
+7. **📋 1-Click WordPress Gutenberg & Markdown Export**: Outputs standard Markdown and 100% native Gutenberg HTML comments (`<!-- wp:heading -->`, `<!-- wp:paragraph -->`, `<!-- wp:list -->`, `<!-- wp:quote -->`, `<!-- wp:code -->`) ready to paste directly into the WordPress Code Editor. All assets and keyframes are packaged into `blog_pack_wordpress.zip`.
+8. **Bridge to Thumbnail Studio**: Includes a direct action button (`🎨 Open Thumbnail Studio (Tab 8)`) to immediately create custom AI thumbnails or stickers for the blog post.
+
+### 🎨 Tab 8 — AI Thumbnail & Visuals Studio (Qwen-Image-2.1 — Optional)
+
+Dedicated top-level AI image generation studio powered by Alibaba's unified 7B DiT model (`Qwen/Qwen-Image-2.1`):
+
+1. **Spacious 2-Column Professional Layout**:
+   - **Left Column**: Multi-variant style presets dropdown (select 1 to 3 styles) with 1-click curated quick packs (Standard 3-Pack, Travel & Adventure, Tech & Neon, Clean SaaS), visual prompt with 3D typography helper, 1-click AI Prompt Assistant, aspect ratios (`16:9`, `9:16`, `1:1`, `4:3`), optional reference photo upload, and **⚙️ Advanced Settings** (40 Steps, CFG Guidance Scale, Negative Prompt, Seed).
+   - **Right Column**: Interactive preview tabs dynamically named after your chosen variants (e.g. `Variant A : Travel & Scenic Adventure`, `Variant B : Editorial Portrait`, etc.), comparison gallery, download actions, and direct 1-click **⭐ Use as Blog Thumbnail** sync with Tab 7.
+2. **🧪 Custom YouTube A/B Testing Studio (1 to 3 Selected Variants)**: Choose any combination of styles or use quick packs for YouTube Studio's *'Test & Compare'* feature:
+   - **Multi-Variant Flexibility**: Select 1 style for a single image, or choose up to 3 distinct styles (e.g. Travel, Tech Glow, Editorial, SaaS, etc.) to compare performance.
+   - **Dynamic Tab Synching**: Tab labels on the right update in real-time to match your selected styles without hardcoded overrides or selection loops.
+   - **📦 1-Click ZIP Pack**: Packages all generated sanitized PNGs with a `README_YOUTUBE_AB_TEST.txt` guide detailing each variant and how to upload them directly into YouTube Studio's *'Test & compare'* tool.
+3. **✨ Official Alibaba Prompt Engineering Framework (`Qwen-Image-2.1-PE-T2I`)**:
+   - **Observer Role**: Natural third-person scene description reporting what is in the frame, rather than generic renderer commands.
+   - **Banned Quality Boosters**: Formally purges empty buzzwords (*"8K"*, *"masterpiece"*, *"hyperrealistic"*, *"award-winning"*) that pollute DiT embeddings.
+   - **Spatial Anchoring**: Precisely places objects and badges using physical anchors (*In the center of the frame*, *To the left*, *On the right*, *In the lower third*, *Across the background*).
+   - **Physical Materials & Lighting**: Specifies tangible surfaces (*brushed titanium, carved dark walnut, frosted glass, acrylic, neon glass tubes*) and dedicated cinematic lighting (*overhead softbox, Rembrandt triangle shadows, golden rim highlights, volumetric haze*).
+   - **Strict Punctuation & Version Preservation**: Straight double quotes (`reads "ZAST TRANSLATE 1.21"`) with strict preservation of decimal points and version numbers.
+4. **🎨 12 Curated Aesthetic Presets (Alibaba Space & GitHub Showcases)**:
+   - `YouTube Viral High-CTR`: High-contrast electric cyan and warm amber rim lighting, prominent 3D typography, dark acoustic studio environment.
+   - `Photorealistic Studio Shot`: Commercial studio photography, physical custom-milled 3D acrylic letters, 85mm prime lens at f/1.8, soft circular bokeh, overhead softbox diffusion.
+   - `Travel & Scenic Adventure`: Expansive travel documentary photography, 24mm wide-angle, majestic golden hour landscape, natural textures, and organic stone/wood typography.
+   - `Editorial Portrait & Creator`: Medium-format creator workspace portrait, natural skin textures with visible micro-pores, linen clothing, morning sidelight, and subtle film grain.
+   - `Culinary & Food Lifestyle`: Mouthwatering commercial food photography, 50mm macro, artisanal gourmet plating, fresh herbs, rising steam, and natural window lighting.
+   - `Business, Finance & News`: Authoritative business editorial documentary, modern boardroom skyline at twilight, upward data trends, and polished gold/charcoal typography.
+   - `Gaming & Epic Cinematic`: High-energy action gaming scene, battle-hardened warrior, chiseled fiery metallic 3D typography, volumetric smoke, and celestial energy beams.
+   - `Refined Typography Poster`: High-end Art Deco geometric typography poster, ivory and champagne gold lettering with strict hierarchy, and clean negative space.
+   - `3D Isometric & Tech Glow`: Clean isometric 3D models with neon accents, soft ambient occlusion shadows, and modern tech aesthetic.
+   - `Cyberpunk & Bold Neon`: High-contrast dark backgrounds with vivid magenta and cyan neon glow, wet reflective asphalt, and volumetric night haze.
+   - `Minimalist & Clean SaaS`: Modern editorial frosted-glass cards, subtle gradients, soft contact shadows, and generous negative space.
+   - `Transparent RGBA (Sticker / Cutout)`: Clean alpha cutout with zero background, compliant with Alibaba's native RGBA transparency syntax.
+5. **💡 1-Click Official Prompt Showcase (Alibaba Examples)**: Built-in interactive gallery with 8 full-scene showcase examples (Travel Adventure, Creator Portrait, Night Train Travel Poster, Artisanal Ramen Culinary, Global Market Finance, Boss Fight Gaming, Viral AI Video Tech, and Transparent RGBA Sticker). Click any example to immediately load its full prompt, preset, and optimal aspect ratio into the UI in 1 click.
+6. **⚡ Technical Controls & Convergence**:
+   - **40 Diffusion Steps Standard**: Strictly guarantees 40 inference steps (Alibaba's official default) for crisp, noise-free convergence.
+   - **🎯 Guidance Scale (CFG 1.0 to 6.0)**: Adjustable Classifier-Free Guidance (2.0 to 3.5 recommended for studio contrast and razor-sharp lettering).
+   - **🚫 Negative Prompt**: Automatically engaged when CFG > 1.0 to suppress blurriness, distortion, and dark artifacts.
+7. **🪟 Native RGBA Transparency Support**: Generates transparent PNG stickers, graphic cutouts, and overlays with alpha channel directly from prompt triggers without needing background removal tools.
+8. **🛡️ Anti-AI Detection Metadata Sanitizer**: Automatically purges all generation metadata (EXIF tags, PNG `tEXt`/`zTXt`/`iTXt` chunks, prompts, model identifiers, diffusers signatures, C2PA) on save, reconstructing images from raw pixel buffers so they appear 100% human-crafted.
+9. **💡 Context-Aware AI Prompt Assistant**: Converts short ideas into rich high-CTR visual prompts with quoted 3D typography (`"YOUR TITLE"`):
+   - *Prompt Typed*: Emphasizes your custom keywords and designs matching lighting and composition.
+   - *From Blog Studio (Tab 7)*: If prompt is empty, it automatically pulls your **SEO Focus Keyword & H1 Title** from Tab 7.
+   - *From Video (Tab 1)*: If no blog exists, it automatically parses your imported video title (cleaning filler words like *'how-to'*, *'tutorial'*).
+10. **📥 1-Click Pinokio Launchers & Disk / VRAM Cleaning Controls**:
+    - **`clean_cache.js` (`🧹 Clean Cache (Temp)`)**: 1-click Pinokio maintenance script that purges the temporary workspace directory (`temp/`) without touching finished outputs or models.
+    - **`clean_output.js` (`🗑️ Clean Output`)**: 1-click Pinokio maintenance script that cleans all exported videos, audio tracks, and ZIP archives from `output/` to recover disk space.
+    - **`🧹 Free VRAM (Unload)` (In-App Button)**: Immediately unloads Qwen-Image-2.1 model weights from GPU memory to 0% VRAM usage, freeing resources for WhisperX transcription or VoxCPM 2 vocal dubbing.
+    - **`🗑️ Free Disk Space (Delete Weights)` (In-App Button)**: Safely deletes local model weights (~33 GB) from disk (`models/qwen_image/`) on user demand.
+    - **`qwen_image_install.js` (`📥 Install Qwen-Image`)**: Dedicated 1-click launcher to download and configure model weights whenever desired.
+
 
 ### ℹ️ Help tab
 
@@ -338,10 +376,16 @@ The built-in Help tab provides detailed usage instructions, troubleshooting tips
 
 ## Requirements
 
-- **GPU**: NVIDIA GPU with 4+ GB VRAM recommended (CUDA)
-- **CPU**: Works on CPU but significantly slower
-- **Disk**: ~8 GB for models (downloaded on first use)
-- **OS**: **Tested on Windows only**. May work on Linux/macOS but untested.
+- **Core App (WhisperX, Translation, VoxCPM 2 Voice Dubbing, 9:16 Shorts)**:
+  - **GPU**: NVIDIA GPU with 6+ GB VRAM recommended (CUDA)
+  - **RAM**: 16 GB System RAM recommended
+  - **Disk**: ~8 GB for models (downloaded on first use)
+  - **OS**: **Tested on Windows only** (with Pinokio).
+- **🎨 Qwen-Image-2.1 Visuals Studio (100% Optional)**:
+  - **GPU**: NVIDIA GPU with **8 to 12+ GB VRAM** (with CPU offload) or 24 GB VRAM (native BF16)
+  - **RAM**: **32 GB System RAM** recommended (for fast CPU-to-GPU layer offloading)
+  - **Disk**: **~33 GB** for model weights (`Qwen/Qwen-Image-2.1`)
+  - *Non-blocking*: The core application functions 100% without downloading or running Qwen-Image-2.1.
 
 ## API (Programmatic Access)
 
@@ -437,13 +481,13 @@ These messages appear in the terminal but **do not affect functionality** and ca
 - 🌐 [zast57.com](https://zast57.com) — Website
 - 🤓 [paradoxetemporel.fr](https://paradoxetemporel.fr) — Tech & Geek blog
 - 🎬 [zast.fr](https://zast.fr) — YouTube channel
-- 📺 [Tutoriel ZastTranslate sur YouTube](https://youtu.be/M0JQYwzlEfU) — Guide vidéo pas à pas complet : doubler une vidéo avec sa voix en local
+- 📺 [ZastTranslate YouTube Tutorial](https://youtu.be/M0JQYwzlEfU) — Complete step-by-step video guide: dub any video locally with your own voice
 
 ## Credits
 
 - [WhisperX](https://github.com/m-bain/whisperX) — Speech recognition & transcription
 - [Humanizer](https://github.com/blader/humanizer) — Anti-AI writing style rules engine (blader/humanizer & WikiProject AI Cleanup)
-- [FLUX.1-schnell](https://blackforestlabs.ai/) — 12B flow transformer generative image model (Black Forest Labs)
+- [Qwen-Image-2.1](https://huggingface.co/Qwen/Qwen-Image-2.1) — 7B unified DiT generative image model with native RGBA transparency (Qwen / Alibaba Cloud)
 - [Qwen2.5-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct) — LLM backend (text fitting & reformulation)
 - [Qwen3.5-9B](https://huggingface.co/Qwen/Qwen3.5-9B) — LLM backend (text fitting & reformulation)
 - [EuroLLM-9B-Instruct](https://huggingface.co/utter-project/EuroLLM-9B-Instruct) — LLM backend (European languages)
@@ -459,6 +503,26 @@ These messages appear in the terminal but **do not affect functionality** and ca
 MIT
 
 ## History
+
+- **Beta 1.21**
+  - **⚡ SOTA Image Generation Upgrade (Qwen-Image-2.1 — 100% Optional)**:
+    - **Unified 7B DiT Architecture**: Replaced FLUX.1-schnell with Alibaba's unified `Qwen/Qwen-Image-2.1` model, powering both Text-to-Image and unified Reference Image editing within a single pipeline.
+    - **✨ Official Alibaba Prompt Engineering Integration (`Qwen-Image-2.1-PE-T2I`)**: Implemented Alibaba's 8-step observer prompt framework with 8-14 spatial anchors (*In the center, To the left, In the lower third*), tangible materials (*brushed titanium, carved walnut, frosted glass*), and dedicated lighting sentences. Banned noisy buzzwords (*"8K"*, *"masterpiece"*).
+    - **🔤 Decimal & Punctuation Safe Typographic Engine**: Fixed version number stripping in `clean_ascii_typography` so that dots and punctuation (e.g. `1.21`) are strictly preserved rather than collapsed to `121`.
+    - **⚡ True 40-Step Diffusion Convergence**: Fixed regex step parsing in `on_run_flux` and `on_run_flux_ab` so that selecting 40 steps executes at true 40 DiT iterations (resolving legacy FLUX 10-step clamping that caused blurry/dark outputs).
+    - **🎯 Guidance Scale (CFG) & Negative Prompting**: Added an interactive CFG slider (1.0 to 6.0) in Advanced Settings with automated negative prompt suppression to enhance contrast and typography sharpness.
+    - **🎨 12 Curated Style Presets**: Expanded presets with official Alibaba Space showcases (`Travel & Scenic Adventure`, `Culinary & Food Lifestyle`, `Business, Finance & News`, `Gaming & Epic Cinematic`, `Editorial Portrait & Creator`, `Refined Typography Poster`, `Photorealistic Studio Shot`, `YouTube Viral High-CTR`, `3D Isometric & Tech Glow`, `Cyberpunk & Bold Neon`, `Minimalist & Clean SaaS`, and `Transparent RGBA`).
+    - **🪟 Native RGBA Transparency**: Generates transparent PNG stickers, graphic cutouts, and YouTube overlays directly with alpha channels without needing external background removal tools.
+    - **🧪 Custom Multi-Variant A/B Testing Studio (1 to 3 Variants)**: Pick 1 to 3 custom aesthetic presets from the 12 curated styles or use 1-click curated quick packs (Standard 3-Pack, Travel & Adventure, Tech & Neon, Clean SaaS). Preview tabs dynamically sync in real-time with zero circular override loops, and package outputs into a ready-to-upload ZIP for YouTube Studio's *'Test & Compare'*.
+    - **🛡️ 100% Anti-AI Metadata Purging**: All generated images have their EXIF tags, PNG chunks, and AI generation metadata completely erased on export.
+    - **🧹 1-Click Clean & Maintenance Suite (Pinokio & In-App)**:
+      - **`clean_cache.js` (`🧹 Clean Cache (Temp)`)**: 1-click Pinokio maintenance script to clean temporary working files in `temp/` without touching finished outputs or AI models.
+      - **`clean_output.js` (`🗑️ Clean Output`)**: 1-click Pinokio maintenance script to wipe exported videos, audio tracks, and ZIP archives from `output/` to reclaim disk space.
+      - **`🧹 Free VRAM (Unload)` (In-App Button)**: Releases 100% of GPU memory occupied by Qwen-Image-2.1 weights on user demand.
+      - **`🗑️ Free Disk Space (Delete Weights)` (In-App Button)**: Purges local model files (`models/qwen_image/`) reclaiming ~33 GB on disk.
+    - **💾 Memory & VRAM Efficiency**: Seamless CPU offload (`enable_model_cpu_offload()`) running in ~8-12 GB VRAM on GPU with instant VRAM unload button.
+    - **🎨 Dedicated Tab 8 (Thumbnail Studio) Ergonomic Promotion**: Promoted the generative AI image studio from a nested sub-tab in Blog Studio into a top-level first-class workspace (`8. 🎨 Thumbnail Studio`) with direct 1-click bridge navigation, and streamlined Tab 7 (`Blog Studio`) for focused article writing and HD keyframe extraction.
+    - **100% Non-Blocking & Optional**: The entire core app starts and functions without Qwen-Image; model weights (~33 GB) and dependencies are downloaded only on explicit user request via Tab 8 or `qwen_image_install.js`.
 
 - **Beta 1.20**
   - **⚡ Quadruple Acceleration Architecture (Zero Quality Loss)**:
@@ -568,7 +632,7 @@ MIT
   - **Automatic YouTube Chapters Generation**: The LLM analyzes the Wav2Vec2 timestamped subtitle cues to automatically extract topic shifts and output YouTube-compliant chapter timecodes (`00:00 - Introduction`, `MM:SS - Chapter Title`).
   - **Live YouTube Trending Keyword Suggestions**: Integrated live YouTube Autocomplete search discovery (zero API key required) to identify high-volume search queries and enrich generated video tags and titles.
   - **Thematic Hashtag Packages**: Offers 4 distinct targeted hashtag packages (Subject-Specific, General Tech/AI, Local Hardware/LLM, and Productivity/Automation) with 1-click selection and real-time description updates.
-  - **Seamless Downstream Translation & Bulk Metadata Pipeline**: Added a 1-click `📥 Appliquer aux Métadonnées` action that seamlessly populates `state.video_info`, Single Translation (`original_title_input`, `original_desc_input`), and Bulk Mode (`bulk_title_input`, `bulk_desc_input`), ensuring generated descriptions and titles are automatically translated across all target languages.
+  - **Seamless Downstream Translation & Bulk Metadata Pipeline**: Added a 1-click `📥 Apply as Original Video Metadata` action that seamlessly populates `state.video_info`, Single Translation (`original_title_input`, `original_desc_input`), and Bulk Mode (`bulk_title_input`, `bulk_desc_input`), ensuring generated descriptions and titles are automatically translated across all target languages.
 - **Beta 1.08**
   - **NVIDIA RTX 50-Series Support (Blackwell / `sm_120`)**: Upgraded PyTorch backend to CUDA 12.8 (`cu128`), introducing full native support for NVIDIA GeForce RTX 5070, RTX 5070 Ti, RTX 5080, and RTX 5090 GPUs (compute capability `sm_120`), resolving `CUDA capability sm_120 is not compatible` errors during Demucs audio separation and model inference.
   - **WhisperX AI & Tech Context Priming (`initial_prompt`)**: Injected a comprehensive AI/tech domain context prompt (`Claude.ai`, `ChatGPT`, `Anthropic`, `Pinokio`, `Midjourney`, etc.) combined with imported video titles into WhisperX's autoregressive decoder. This eliminates phonetic acoustic hallucinations (such as transcribing "Claude.ai" as "CloudEye").
@@ -741,7 +805,7 @@ curl -X POST http://127.0.0.1:7860/api/predict/ \
 ZastTranslate stands on the shoulders of these remarkable open-source projects:
 
 - **🛡️ [Humanizer](https://github.com/blader/humanizer)** by [@blader](https://github.com/blader) (MIT License) — Anti-AI writing style rules, patterns, and guidelines adapted from Wikipedia's *[WikiProject AI Cleanup (Signs of AI writing)](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing)*.
-- **⚡ [FLUX.1-schnell](https://github.com/black-forest-labs/flux)** by Black Forest Labs (Apache 2.0) — Ultra-fast 4-step flow transformer architecture with state-of-the-art text rendering and typography.
+- **⚡ [Qwen-Image-2.1](https://huggingface.co/Qwen/Qwen-Image-2.1)** by Qwen / Alibaba Cloud — Unified 7B single-stream diffusion transformer for text-to-image, reference editing, and native RGBA transparency.
 - **🎙️ [WhisperX](https://github.com/m-bain/whisperX)** by Max Bain — Fast automatic speech recognition with word-level forced alignment.
 - **🎵 [Demucs](https://github.com/facebookresearch/demucs)** by Meta AI — High-fidelity deep audio music and vocal source separation.
 - **🎬 [PySceneDetect](https://github.com/Breakthrough/PySceneDetect)** — Intelligent camera shot boundary and scene change detection.

@@ -24,6 +24,7 @@ module.exports = {
                 },
                 message: [
                     "uv pip install gradio",
+                    "uv pip install pip-system-certs",
                     "uv pip install -r requirements.txt --override overrides.txt"
                 ]
             }

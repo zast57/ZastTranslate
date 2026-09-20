@@ -640,7 +640,7 @@ class SEOArticleGenerator:
         # Build comprehensive knowledge base from segments
         if not segments:
             return {
-                "error": "Aucune transcription disponible. Veuillez d'abord importer une vidéo ou un fichier SRT."
+                "error": "No transcription available. Please import a video or an SRT file first."
             }
 
         video_title = ""
@@ -763,9 +763,9 @@ SECONDARY_KEYWORDS: [3 à 5 mots-clés secondaires séparés par des virgules]
 ---END_ARTICLE_CONTENT---
 
 ---IMAGE_PROMPTS---
-IMAGE_1: [Prompt en anglais pour l'image à la une / Featured Image, style moderne photoréaliste ou illustration éditoriale en lien direct avec le sujet]
-IMAGE_2: [Prompt en anglais pour illustrer la deuxième section thématique]
-IMAGE_3: [Prompt en anglais pour illustrer la section conseils et cas pratiques]
+IMAGE_1: [Prompt en anglais pour Qwen-Image-2.1 suivant les regles officielles Alibaba : description d'observateur au present (The image is a wide...), ancres spatiales (In the center, to the left), typographie entre guillemets stricts (reads "MOT_CLE"), matieres reelles (brushed titanium, dark walnut) et eclairage cinematique, sans aucun mot banni comme 8k ou masterpiece]
+IMAGE_2: [Prompt en anglais pour la section 2 suivant les regles Qwen-Image-2.1 : style photo de studio ou rendu 3D isometrique avec ancres spatiales et lumieres directionnelles]
+IMAGE_3: [Prompt en anglais pour la section 3 suivant les regles Qwen-Image-2.1 : scene editoriale ou photo de produit/bureau contemporain avec textures naturelles et lumiere douce]
 ---END_IMAGE_PROMPTS---
 """
         else: # English & generic (Humanizer 35-Pattern Benchmark)
@@ -829,9 +829,9 @@ SECONDARY_KEYWORDS: [3 to 5 secondary keywords separated by commas]
 ---END_ARTICLE_CONTENT---
 
 ---IMAGE_PROMPTS---
-IMAGE_1: [AI Image prompt for Featured Header image in English, photorealistic or editorial illustration directly related to the topic]
-IMAGE_2: [AI Image prompt for Section 2 in English]
-IMAGE_3: [AI Image prompt for Section 3 in English]
+IMAGE_1: [High-CTR AI Image prompt in English strictly following official Alibaba Qwen-Image-2.1 guidelines: observer perspective describing what is in the frame starting with 'The image is a wide...', 8-14 spatial anchors (In the center, to the left, on the lower third), physical materials (brushed titanium, dark walnut, frosted glass), exact typography in straight double quotes e.g. reads "KEYWORD", dedicated cinematic lighting sentence. NEVER use banned buzzwords like 8k, masterpiece, or award-winning.]
+IMAGE_2: [AI Image prompt for Section 2 in English following Qwen-Image-2.1 observer guidelines: editorial workspace or 3D isometric tech layout with spatial anchors and clean studio lighting]
+IMAGE_3: [AI Image prompt for Section 3 in English following Qwen-Image-2.1 observer guidelines: clean modern infographic or commercial product photography with physical textures and natural daylight]
 ---END_IMAGE_PROMPTS---
 """
 
@@ -1031,9 +1031,9 @@ En appliquant ces étapes méthodiquement, vous disposez d'une base solide et p�
 ---END_ARTICLE_CONTENT---
 
 ---IMAGE_PROMPTS---
-IMAGE_1: Sleek high-tech banner illustration representing {title}, dark mode glassmorphism, 4k resolution
-IMAGE_2: Minimalist step-by-step tutorial diagram illustration for {title}, clean vector aesthetics
-IMAGE_3: Modern workspace screenshot mockup demonstrating productivity benefits of {title}
+IMAGE_1: The image is a wide cinematic tech editorial photograph of a modern software creator studio. In the center, custom embossed titanium typography on a dark studio desk reads "{title}" with clean bevelled edges. To the left, a modern laptop displays real-time waveforms beside studio audio monitors. The lighting is soft and directional with a subtle cyan key light and golden rim highlights. The overall composition is punchy, balanced, and modern.
+IMAGE_2: The image is a wide 3D isometric digital rendering of an organized workflow platform for {title}. In the center, floating translucent glass interface tiles display step-by-step progress cards and glowing data paths across a deep slate surface. The lighting is crisp with soft ambient occlusion shadows.
+IMAGE_3: The image is a commercial studio photograph of a contemporary creator desk. A professional broadcast microphone and silver laptop sit on dark polished wood, with soft morning daylight streaming from a window on the right.
 ---END_IMAGE_PROMPTS---
 """
         else:
@@ -1074,9 +1074,9 @@ By following these structured guidelines, you now have a reliable foundation. Ad
 ---END_ARTICLE_CONTENT---
 
 ---IMAGE_PROMPTS---
-IMAGE_1: Modern digital concept artwork representing {title}, futuristic neon accents, photorealistic
-IMAGE_2: Clean infographic style workflow layout explaining {title} step by step
-IMAGE_3: High performance dashboard mockup showing real-world results of {title}
+IMAGE_1: The image is a wide cinematic tech editorial photograph of a modern software creator studio. In the center, custom embossed titanium typography on a dark studio desk reads "{title}" with clean bevelled edges. To the left, a modern laptop displays real-time waveforms beside studio audio monitors. The lighting is soft and directional with a subtle cyan key light and golden rim highlights. The overall composition is punchy, balanced, and modern.
+IMAGE_2: The image is a wide 3D isometric digital rendering of an organized workflow platform for {title}. In the center, floating translucent glass interface tiles display step-by-step progress cards and glowing data paths across a deep slate surface. The lighting is crisp with soft ambient occlusion shadows.
+IMAGE_3: The image is a commercial studio photograph of a contemporary creator desk. A professional broadcast microphone and silver laptop sit on dark polished wood, with soft morning daylight streaming from a window on the right.
 ---END_IMAGE_PROMPTS---
 """
 
@@ -1324,7 +1324,7 @@ IMAGE_3: High performance dashboard mockup showing real-world results of {title}
         output_dir: str,
         num_images: int = 4,
         topic_title: str = "article",
-        target_resolution: str = "1080p (Full HD - 1920x1080) [Recommandé Articles & Google SEO]",
+        target_resolution: str = "1080p (Full HD - 1920x1080) [Recommended for Articles & Google SEO]",
         enhance_text_clarity: bool = True
     ) -> List[Dict[str, Any]]:
         """
@@ -1415,7 +1415,7 @@ IMAGE_3: High performance dashboard mockup showing real-world results of {title}
                         min_dist = dist
                         matching_seg = s
 
-            seg_text = matching_seg.get("text", "").strip() if matching_seg else f"Étape {idx+1}"
+            seg_text = matching_seg.get("text", "").strip() if matching_seg else f"Step {idx+1}"
             clean_caption = re.sub(r'[\r\n]+', ' ', seg_text)[:110]
 
             img_filename = f"{clean_slug}-capture-{idx+1}.jpg"

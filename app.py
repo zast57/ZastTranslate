@@ -50,7 +50,7 @@ from modules.youtube_publisher import YouTubePublisher
 from modules.seo_assistant import seo_assistant
 from modules.shorts_generator import shorts_studio
 from modules.blog_generator import blog_generator, sync_humanizer_rules_from_github
-from modules.flux_generator import flux_studio
+from modules.qwen_image_generator import qwen_image_studio, qwen_image_studio as flux_studio
 from fitted_cps_config import get_fitted_cps, get_effective_cps, load_user_cps, save_user_cps, FITTED_CPS_BY_LANG
 
 import pandas as pd
@@ -1911,13 +1911,60 @@ def step5_bulk_run(target_langs, voice_mode, voice_file, never_cut, output_type,
 
 
 def open_output_folder():
-    """Open the output folder in the OS file explorer."""
-    if os.path.exists(OUTPUT_DIR):
+    """Open the output folder in the OS file explorer with visual feedback."""
+    norm_path = os.path.normpath(OUTPUT_DIR)
+    os.makedirs(norm_path, exist_ok=True)
+    opened = False
+    try:
         if os.name == 'nt':
-            os.startfile(OUTPUT_DIR)
+            import subprocess
+            subprocess.Popen(['explorer', norm_path])
+            opened = True
         else:
             import subprocess
-            subprocess.Popen(['xdg-open' if sys.platform.startswith('linux') else 'open', OUTPUT_DIR])
+            subprocess.Popen(['xdg-open' if sys.platform.startswith('linux') else 'open', norm_path])
+            opened = True
+    except Exception as e:
+        try:
+            if hasattr(os, 'startfile'):
+                os.startfile(norm_path)
+                opened = True
+        except Exception:
+            pass
+
+    try:
+        gr.Info(f"📂 Output folder opened in Explorer:\n{norm_path}")
+    except Exception:
+        pass
+
+    return f"📂 Output folder opened in Windows Explorer: `{norm_path}` (check taskbar or behind browser window)"
+
+def clear_output_folder():
+    """Delete all files and subfolders inside output/ to free disk space."""
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        return "ℹ️ Output folder is already empty."
+    count = 0
+    total_bytes = 0
+    for item in os.listdir(OUTPUT_DIR):
+        item_path = os.path.join(OUTPUT_DIR, item)
+        try:
+            if os.path.isfile(item_path) or os.path.islink(item_path):
+                total_bytes += os.path.getsize(item_path)
+                os.remove(item_path)
+                count += 1
+            elif os.path.isdir(item_path):
+                for root, dirs, files in os.walk(item_path):
+                    for f in files:
+                        total_bytes += os.path.getsize(os.path.join(root, f))
+                shutil.rmtree(item_path, ignore_errors=True)
+                count += 1
+        except Exception as e:
+            print(f"Error deleting {item_path}: {e}")
+    mb = total_bytes / (1024 * 1024)
+    gb = mb / 1024
+    size_str = f"{gb:.2f} GB" if gb >= 1.0 else f"{mb:.1f} MB"
+    return f"🧹 Output folder cleared! Deleted {count} items ({size_str} freed)."
 
 def step6_publish_youtube(progress=gr.Progress()):
     if not state.video_info or not state.video_info.get('youtube_id'):
@@ -2598,7 +2645,7 @@ def step8_generate_blog_post(
         res_summary = extracted_images[0].get('resolution_str', '1080p')
         visuals_line = f"- 🖼️ **Extracted Visuals:** {len(extracted_images)} HD keyframes ({res_summary}) with text/code clarity filter"
     else:
-        visuals_line = "- ⚠️ **Extracted Visuals:** Aucune image extraite (aucun fichier vidéo .mp4 source trouvé dans temp/). Importez la vidéo en Onglet 1 pour générer les captures."
+        visuals_line = "- ⚠️ **Extracted Visuals:** No images extracted (no source .mp4 video found in temp/). Please import your video in Tab 1 to extract keyframes."
 
     status_summary = (
         f"🎉 **SEO Blog Article Generated Successfully!**\n\n"
@@ -4019,20 +4066,38 @@ def _get_tab_guide_html(tab_num: int) -> str:
             ]
         },
         7: {
-            "goal": "Transform any transcribed video into a human-sounding, high-ranking SEO blog post, extract HD milestone keyframes, and create viral 4K YouTube thumbnails using FLUX.1-schnell.",
+            "goal": "Transform any transcribed video into a human-sounding, high-ranking SEO blog post, extract HD milestone video keyframes, and export copy-paste ready WordPress Gutenberg blocks.",
             "options": [
                 "<b style='color:#ffffff !important;'>Target Language & 6 Writing Styles</b>: <span style='color:#f1f5f9 !important;'>Write in 12+ languages with tailored editorial tones (Step-by-Step Tutorial, Technical Deep-Dive, Storytelling Case Study, Journalistic Review, High-Converting Copywriting, or Beginner's Guide).</span>",
                 "<b style='color:#ffffff !important;'>🛡️ Humanizer Engine (35 Anti-AI Rules)</b>: <span style='color:#f1f5f9 !important;'>Adheres strictly to Wikipedia's WikiProject AI Cleanup standards. Strips robotic clichés ('In this article', 'It is crucial to remember', 'In today's digital age', inflated buzzwords, shallow participle transitions) for authentic human burstiness and search engine trust.</span>",
                 "<b style='color:#ffffff !important;'>🔍 Live Google Suggest Keywords</b>: <span style='color:#f1f5f9 !important;'>Queries real-time Google autocompletion to seamlessly weave high-volume keywords into your H1 title, meta description, and H2/H3 headings without keyword stuffing.</span>",
                 "<b style='color:#ffffff !important;'>📋 1-Click WordPress Gutenberg & Markdown</b>: <span style='color:#f1f5f9 !important;'>Ready-to-paste native block markup (<code>&lt;!-- wp:heading --&gt;</code>, <code>&lt;!-- wp:paragraph --&gt;</code>, <code>&lt;!-- wp:list --&gt;</code>) or clean Markdown. Paste into WordPress Code Editor (<code style='color:#a5b4fc !important; background:rgba(255,255,255,0.15); padding:1px 5px; border-radius:4px;'>Ctrl+Shift+Alt+M</code>) and switch back to Visual Editor. Download complete pack as <code style='color:#a5b4fc !important; background:rgba(255,255,255,0.15); padding:1px 5px; border-radius:4px;'>blog_pack_wordpress.zip</code>.</span>",
-                "<b style='color:#ffffff !important;'>📸 Video Keyframes & SEO ALT Tags</b>: <span style='color:#f1f5f9 !important;'>Extract 1 to 8 HD screenshots from milestone video timestamps, auto-generate descriptive ALT tags and captions, and get ready-to-use AI image prompts (Midjourney, DALL-E 3, Flux).</span>",
-                "<b style='color:#ffffff !important;'>⚡ FLUX.1 AI YouTube Thumbnails & A/B Testing</b>: <span style='color:#f1f5f9 !important;'>12B Flow Transformer generating 4K thumbnails in 4 steps (~2s on GPU). Wrap text in single quotes (<code style='color:#a5b4fc !important; background:rgba(255,255,255,0.15); padding:1px 5px; border-radius:4px;'>'YOUR TITLE'</code>) for razor-sharp 3D typography. Run A/B testing to generate 3 distinct viral variants (Viral High-CTR, 3D Tech Glow, Cinematic Studio) with 100% stripped AI metadata ready for YouTube Studio's Test & Compare!</span>"
+                "<b style='color:#ffffff !important;'>📸 Video Keyframes & SEO ALT Tags</b>: <span style='color:#f1f5f9 !important;'>Extract 1 to 8 HD screenshots from milestone video timestamps with Lanczos scaling, text/code sharpening, and auto-generated descriptive ALT tags.</span>"
             ],
             "steps": [
                 "Select your <b>Target Language</b>, <b>Writing Style</b>, and <b>Target Length</b>.",
                 "Click <b style='color:#818cf8 !important;'>✨ Generate SEO Blog Article & WordPress Kit</b> to produce the complete post, metadata, and keyframes.",
                 "Copy the native <b>Gutenberg Block HTML</b> directly into WordPress Code Editor (Ctrl+Shift+Alt+M), or download the complete ZIP pack.",
-                "Switch to <b>Sub-Tab 3 (Thumbnail Studio)</b>, enter a prompt (put text in quotes: 'MY TITLE'), and click <b style='color:#818cf8 !important;'>⚡ Generate Single Thumbnail</b> or <b style='color:#818cf8 !important;'>🧪 Run A/B Testing</b>."
+                "To generate custom AI thumbnails or stickers, open <b style='color:#818cf8 !important;'>Tab 8 (🎨 Thumbnail Studio)</b>."
+            ]
+        },
+        8: {
+            "goal": "Generate eye-catching YouTube thumbnails, 3D text typography, reference-conditioned visuals, and native transparent RGBA stickers using Qwen-Image-2.1.",
+            "options": [
+                "<b style='color:#ffffff !important;'>🎨 Qwen-Image-2.1 (Unified 7B DiT)</b>: <span style='color:#f1f5f9 !important;'>Alibaba's unified state-of-the-art model for text-to-image, face/product reference editing, and native RGBA transparency.</span>",
+                "<b style='color:#ffffff !important;'>🔤 3D Typography Rendering</b>: <span style='color:#f1f5f9 !important;'>Wrap titles or keywords in double quotes (<code style='color:#a5b4fc !important; background:rgba(255,255,255,0.15); padding:1px 5px; border-radius:4px;'>'YOUR TITLE'</code>) for razor-sharp, rendered 3D text.</span>",
+                "<b style='color:#ffffff !important;'>✨ AI Prompt Assistant (Context Aware)</b>: <span style='color:#f1f5f9 !important;'>Expands your words into high-CTR scene prompts. If the prompt box is empty, it automatically detects and weaves your <b>SEO Focus Keyword / H1 Title from Tab 7 (Blog Studio)</b> or your imported video title from Tab 1 into the 3D text.</span>",
+                "<b style='color:#ffffff !important;'>🧪 Custom A/B Testing Studio (1 to 3 Variants)</b>: <span style='color:#f1f5f9 !important;'>Select 1 to 3 custom styles from the dropdown or use 1-click curated quick packs (Standard 3-Pack, Travel & Adventure, Tech & Neon, Clean SaaS). Right-side preview tabs update dynamically in real time and package into a ready-to-upload ZIP for YouTube Studio's <i>'Test & Compare'</i> tool.</span>",
+                "<b style='color:#ffffff !important;'>🪟 Transparent RGBA Alpha Channel</b>: <span style='color:#f1f5f9 !important;'>Select 'Transparent RGBA' preset to create clean cutouts and stickers without external clipping tools.</span>",
+                "<b style='color:#ffffff !important;'>⚡ 40 Steps & CFG Quality Scale</b>: <span style='color:#f1f5f9 !important;'>Guaranteed 40 diffusion steps convergence with CFG guidance slider (1.0 to 6.0) and negative prompting for studio-grade contrast.</span>",
+                "<b style='color:#ffffff !important;'>🛡️ 100% Anti-AI Metadata Stripping</b>: <span style='color:#f1f5f9 !important;'>All generative AI tags (EXIF, C2PA, prompts) are permanently erased on export.</span>"
+            ],
+            "steps": [
+                "Select 1 to 3 <b>Style Presets</b> (or click a 1-click Quick Pack e.g. Travel & Adventure).",
+                "Enter a visual description in the prompt box (put text in quotes for 3D titles: 'MY TITLE'), or click <b style='color:#818cf8 !important;'>✨ AI Prompt Assistant</b> (auto-pulls from Blog Studio or Video Title if empty).",
+                "Optionally drop a face or product photo into the <b>Reference Photo</b> box.",
+                "Click <b style='color:#818cf8 !important;'>🚀 Generate Single Visual</b> or <b style='color:#818cf8 !important;'>🧪 Generate A/B Test Variants</b>.",
+                "Download the sanitized PNGs or ZIP pack, or click <b style='color:#818cf8 !important;'>⭐ Use as Blog Thumbnail</b> to sync with Tab 7."
             ]
         },
         9: {
@@ -4392,10 +4457,13 @@ with gr.Blocks(title="ZastTranslate") as app:
                                 btn_export_audio = gr.Button("🎵 Download Audio Track (WAV)", variant="secondary")
                             export_audio_file = gr.File(label="Download Audio Track (WAV)", interactive=False)
                     with gr.Row():
-                        btn_open_output_tab4 = gr.Button("📂 Open Output Folder", variant="secondary")
+                        btn_open_output_tab4 = gr.Button("📂 Open Output Folder in Explorer", variant="secondary", scale=2)
+                        btn_clear_output_tab4 = gr.Button("🗑️ Clear Output Folder", variant="secondary", scale=1)
+                    output_status_tab4 = gr.Markdown(value="")
                     with gr.Row(elem_classes=["zast-next-step-row"]):
                         btn_next_tab4_to_shorts = gr.Button("📱 Create Viral Shorts (Tab 6)", variant="secondary", elem_classes=["zast-next-step-btn"])
-                        btn_next_tab4_to_blog = gr.Button("📝 Generate Blog Post (Tab 7)", variant="primary", elem_classes=["zast-next-step-btn"])
+                        btn_next_tab4_to_blog = gr.Button("📝 Generate Blog Post (Tab 7)", variant="secondary", elem_classes=["zast-next-step-btn"])
+                        btn_next_tab4_to_thumb = gr.Button("🎨 AI Thumbnails (Tab 8)", variant="primary", elem_classes=["zast-next-step-btn"])
         
             with gr.Tab("5. ⚡ Bulk Mode", id="tab_bulk") as tab5:
                 with gr.Accordion("💡 Quick Guide & Options Explained (Tab 5: Bulk Mode)", open=False, elem_classes=["zast-tab-guide-accordion"]):
@@ -4457,7 +4525,9 @@ with gr.Blocks(title="ZastTranslate") as app:
                     bulk_status_output = gr.Textbox(label="Status", interactive=False)
                     bulk_files_output = gr.File(label="Generated Files Output", file_count="multiple")
                     with gr.Row():
-                        btn_open_output = gr.Button("📂 Open Output Folder in Windows Explorer", variant="secondary")
+                        btn_open_output = gr.Button("📂 Open Output Folder in Windows Explorer", variant="secondary", scale=2)
+                        btn_clear_output_tab5 = gr.Button("🗑️ Clear Output Folder", variant="secondary", scale=1)
+                    output_status_tab5 = gr.Markdown(value="")
                     bulk_metadata_output = gr.Markdown(label="Translated Metadata", height=400)
         
             with gr.Tab("6. 📱 Viral Shorts", id="tab_shorts") as tab6:
@@ -4604,102 +4674,91 @@ with gr.Blocks(title="ZastTranslate") as app:
                 gr.Markdown("<small>💡 *The Complete Shorts Pack (.ZIP) includes all rendered vertical MP4s, individual SRT subtitle files, and metadata summary.*</small>")
         
             with gr.Tab("7. 📝 Blog Studio", id="tab_blog") as tab7:
-                with gr.Accordion("💡 Quick Guide & Options Explained (Tab 7: SEO Blog & Thumbnails)", open=False, elem_classes=["zast-tab-guide-accordion"]):
+                with gr.Accordion("💡 Quick Guide & Options Explained (Tab 7: SEO Blog & WordPress Studio)", open=False, elem_classes=["zast-tab-guide-accordion"]):
                     gr.HTML(_get_tab_guide_html(7))
                 with gr.Group(elem_classes=["zast-studio-card"]):
-                    gr.Markdown(f"### 📝 SEO Blog Post & Content Studio (WordPress Ready) {zast_tooltip('Generates complete high-ranking articles from transcriptions with 35 WikiProject anti-AI rules, HD keyframes, and WordPress Gutenberg blocks.')} <span class='zast-pill zast-pill-purple'>🛡️ 35-Pattern Humanizer</span>")
+                    gr.Markdown(f"### 📝 SEO Blog Post & Content Studio (WordPress Ready) {zast_tooltip('Generates complete high-ranking articles from transcriptions with 35 WikiProject anti-AI rules, HD keyframes, and WordPress Gutenberg blocks.')} <span class='zast-pill zast-pill-purple'>🛡️ 35-Pattern Humanizer</span> <span class='zast-pill zast-pill-primary'>WordPress Ready</span>")
                     gr.Markdown(
                         "> ℹ️ **Prerequisite:** Please import a video (**Tab 1**) and run Transcription (**Tab 2**) or import an SRT file first.\n\n"
                         "Turn any video and its subtitle transcript into a **complete, human-sounding, high-ranking SEO blog post (without robotic AI clichés)**, "
                         "with calibrated SEO metadata, HD video keyframes, and copy-paste ready Gutenberg block HTML and Markdown."
                     )
 
-                with gr.Group(elem_classes=["zast-studio-card"]):
-                    gr.Markdown(
-                        "> 🛡️ **Humanizer Anti-AI Charter & Live Keyword Discovery:**\n"
-                        "> - **35 Wikipedia AI Cleanup Rules**: Strips robotic clichés (*'In this article'*, *'It is crucial to note'*, *'game-changer'*, *'couteau suisse'*, shallow participle transitions) for authentic human burstiness and search engine trust.\n"
-                        "> - **Real-Time Google Autocomplete**: Queries Google Suggest in real-time (0 API keys needed) to discover high-volume search queries and naturally integrate them into your H1 title and H2/H3 subheadings.\n"
-                        "> - **Sync Rules**: Click `🔄 Sync Anti-AI Rules (GitHub)` to update rule definitions directly from GitHub without restarting."
-                    )
-                    gr.Markdown("#### ⚙️ 1. Article Configuration & Style")
-                    with gr.Row():
-                        blog_target_lang = gr.Dropdown(
-                            choices=["French", "English", "Spanish", "German", "Italian", "Portuguese", "Japanese", "Chinese", "Russian", "Arabic", "Dutch", "Polish"],
-                            label="🌍 Target Language",
-                            value="French",
-                            scale=1,
-                            info="Language in which the full SEO article and metadata will be written."
-                        )
-                        blog_style = gr.Dropdown(
-                            choices=[
-                                "Step-by-Step Tutorial (How-To Guide)",
-                                "Expert & Technical Deep-Dive",
-                                "Storytelling & Case Study",
-                                "Journalistic & Objective Review",
-                                "High-Converting Copywriting",
-                                "Accessible Beginner's Guide"
-                            ],
-                            label="🎨 Writing Style & Tone",
-                            value="Step-by-Step Tutorial (How-To Guide)",
-                            scale=2,
-                            info="Editorial voice adapted to your audience (Tutorial, Technical Deep-Dive, Storytelling, Review, etc.)."
-                        )
-                        blog_length = gr.Dropdown(
-                            choices=[
-                                "Short (600 - 800 words)",
-                                "Medium (1000 - 1500 words)",
-                                "Long (1800 - 2500 words)"
-                            ],
-                            label="📏 Target Length",
-                            value="Medium (1000 - 1500 words)",
-                            scale=1,
-                            info="Target article word count. Medium (~1200w) is recommended for Google ranking."
-                        )
-                    with gr.Row():
-                        with gr.Column(scale=2):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        with gr.Group(elem_classes=["zast-studio-card"]):
+                            gr.Markdown("#### ✍️ 1. Article & Editorial Settings")
+                            blog_target_lang = gr.Dropdown(
+                                choices=["French", "English", "Spanish", "German", "Italian", "Portuguese", "Japanese", "Chinese", "Russian", "Arabic", "Dutch", "Polish"],
+                                label="🌍 Target Language",
+                                value="French",
+                                info="Language in which the full SEO article and metadata will be written."
+                            )
+                            blog_style = gr.Dropdown(
+                                choices=[
+                                    "Step-by-Step Tutorial (How-To Guide)",
+                                    "Expert & Technical Deep-Dive",
+                                    "Storytelling & Case Study",
+                                    "Journalistic & Objective Review",
+                                    "High-Converting Copywriting",
+                                    "Accessible Beginner's Guide"
+                                ],
+                                label="🎨 Writing Style & Tone",
+                                value="Step-by-Step Tutorial (How-To Guide)",
+                                info="Editorial voice adapted to your audience."
+                            )
+                            blog_length = gr.Dropdown(
+                                choices=[
+                                    "Short (600 - 800 words)",
+                                    "Medium (1000 - 1500 words)",
+                                    "Long (1800 - 2500 words)"
+                                ],
+                                label="📏 Target Length",
+                                value="Medium (1000 - 1500 words)",
+                                info="Target article word count. Medium (~1200w) is recommended for Google ranking."
+                            )
                             blog_include_meta = gr.Checkbox(
                                 label="🎯 Generate Complete SEO Kit (H1 Title, Meta Description, URL Slug, Keywords)",
                                 value=True,
                                 info="Generates high-CTR H1 title, clean URL slug, 155-char Google snippet, and LSI keywords."
                             )
-                        with gr.Column(scale=2):
+
+                    with gr.Column(scale=1):
+                        with gr.Group(elem_classes=["zast-studio-card"]):
+                            gr.Markdown("#### 📸 2. Milestone Video Keyframes (FFmpeg)")
                             blog_extract_images = gr.Checkbox(
-                                label="🖼️ Extract Milestone HD Video Keyframes (with SEO ALT Tags & Captions)",
+                                label="🖼️ Extract Milestone HD Video Keyframes",
                                 value=True,
                                 info="Captures crisp milestone HD video keyframes at scene and speech boundaries."
                             )
-                        with gr.Column(scale=2):
                             blog_num_images = gr.Slider(
                                 minimum=2,
                                 maximum=8,
                                 step=1,
                                 value=6,
                                 label="📸 Number of Keyframes",
-                                info="Number of HD video screenshots to capture and format with SEO ALT tags (2 to 8)."
+                                info="Number of HD video screenshots to capture (2 to 8)."
                             )
-                    with gr.Row():
-                        with gr.Column(scale=3):
                             blog_keyframe_res = gr.Dropdown(
                                 choices=[
-                                    "1080p (Full HD - 1920x1080) [Recommandé Articles & Google SEO]",
-                                    "1440p / 2K (2560x1440) [Ultra-Net / Lisibilité Code & Terminal]",
-                                    "720p (HD - 1280x720) [Léger]",
-                                    "Source Native"
+                                    "1080p (Full HD - 1920x1080) [Recommended for Articles & Google SEO]",
+                                    "1440p / 2K (2560x1440) [Ultra-Sharp / Code & Terminal Readability]",
+                                    "720p (HD - 1280x720) [Lightweight]",
+                                    "Native Source"
                                 ],
-                                label="📐 Résolution des Keyframes Vidéo",
-                                value="1080p (Full HD - 1920x1080) [Recommandé Articles & Google SEO]",
-                                info="Résolution d'export des captures d'écran. 1080p garantit une netteté totale et dépasse les exigences Google Discover (>1200px)."
+                                label="📐 Video Keyframe Resolution",
+                                value="1080p (Full HD - 1920x1080) [Recommended for Articles & Google SEO]",
+                                info="Screenshot export resolution. 1080p exceeds Google Discover requirements (>1200px)."
                             )
-                        with gr.Column(scale=3):
                             blog_enhance_text = gr.Checkbox(
-                                label="🔍 Amélioration Netteté Texte & Code (Lanczos + Unsharp Mask)",
+                                label="🔍 Text & Code Clarity Enhancement (Lanczos + Unsharp Mask)",
                                 value=True,
-                                info="Rehausse la netteté et les contours du texte, code, fenêtres de terminal et diapositives pour une lisibilité parfaite."
+                                info="Enhances sharpness and edges of text, code, terminal windows, and slides."
                             )
 
                 with gr.Group(elem_classes=["zast-studio-card"]):
                     _actions_tooltip = zast_tooltip("• Generate: Produces complete article, metadata, and keyframes.\n• Extract Only: Grabs keyframe images without LLM generation.\n• Sync: Fetches latest Wikipedia AI Cleanup rules from GitHub.")
-                    gr.Markdown(f"#### 🚀 2. Generation Actions {_actions_tooltip}")
+                    gr.Markdown(f"#### 🚀 3. Generation Actions {_actions_tooltip}")
                     with gr.Row():
                         btn_generate_blog = gr.Button("✨ Generate SEO Blog Article & WordPress Kit", variant="primary", scale=3)
                         btn_extract_images_only = gr.Button("📸 Extract Video Keyframes Only", variant="secondary", scale=1)
@@ -4708,7 +4767,6 @@ with gr.Blocks(title="ZastTranslate") as app:
                             btn_sync_humanizer = gr.Button("🔄 Sync Anti-AI Rules (GitHub)", variant="secondary", size="sm")
                         with gr.Column(scale=3):
                             humanizer_sync_status = gr.Markdown(value="*🛡️ Anti-AI style correction powered by [Humanizer (blader/humanizer)](https://github.com/blader/humanizer) & WikiProject AI Cleanup.*")
-                    gr.Markdown("<small>💡 *'Generate' produces the complete WordPress Gutenberg article, SEO metadata, and milestone keyframes. 'Extract Video Keyframes Only' captures screenshots without LLM text generation.*</small>")
                     blog_status = gr.Markdown(value="")
 
                 with gr.Tabs():
@@ -4748,22 +4806,21 @@ with gr.Blocks(title="ZastTranslate") as app:
                                     )
                                 with gr.Tab("📝 Standard Markdown"):
                                     blog_markdown_out = gr.Textbox(
-                                        label="Markdown Content",
+                                        label="Article (Standard Markdown)",
                                         lines=20,
                                         max_lines=45,
                                         interactive=True,
                                         buttons=["copy"],
-                                        info="Clean Markdown formatted with H1/H2/H3 headers, bullet points, and image placeholders. Ready for Ghost, Medium, Substack, Hugo, Jekyll, or Notion."
+                                        elem_id="blog_markdown_code",
+                                        info="Clean, structured Markdown formatted with H2/H3 subheadings, callouts, and bullet points."
                                     )
-                            gr.Markdown("<small>💡 *Tip: Click the 'copy' icon in the upper-right corner of either box to copy all formatted text to your clipboard in 1 click.*</small>")
 
-                    with gr.Tab("📸 2. Extracted Video Keyframes"):
+                    with gr.Tab("📸 2. Extracted Video Keyframes & Prompts"):
                         gr.Markdown(
                             "> 💡 **Keyframes & Image SEO Guide:**\n"
                             "> - **Milestone Keyframes**: Extracted at scene transitions and speech peaks using FFmpeg. Each image includes a contextual ALT tag and caption.\n"
                             "> - **Custom Image Override (Drag & Drop)**: You can **drag and drop your own custom screenshot or image** directly into any of the 6 boxes below to replace an extracted frame. Replaced images will be automatically packaged into the WordPress ZIP export!\n"
-                            "> - **WordPress Export Pack**: Click `Download Complete WordPress Pack (.ZIP)` to get all keyframe images, Gutenberg HTML, and Markdown bundled together.\n"
-                            "> - **AI Prompts**: Pre-formatted prompts ready to copy into Midjourney, DALL-E 3, or FLUX to create custom illustrative artwork."
+                            "> - **WordPress Export Pack**: Click `Download Complete WordPress Pack (.ZIP)` to get all keyframe images, Gutenberg HTML, and Markdown bundled together."
                         )
                         _keyframes_tooltip = zast_tooltip("High-resolution frames captured at key scene changes. Drag and drop your own screenshots to override any frame.")
                         gr.Markdown(f"#### 📸 Milestone HD Video Keyframes (Extracted from Video) {_keyframes_tooltip}")
@@ -4794,143 +4851,245 @@ with gr.Blocks(title="ZastTranslate") as app:
                             blog_zip_file = gr.File(label="📦 Download Complete WordPress Pack (.ZIP: Markdown + HTML + Images)")
                         gr.Markdown("<small>💡 *The Complete WordPress Pack (.ZIP) includes all HD images (with SEO-optimized filenames), the full Gutenberg HTML block code, and the clean Markdown article.*</small>")
 
-                        _prompts_tooltip = zast_tooltip("Pre-engineered AI prompts for creating custom cover illustrations and concept diagrams in Midjourney, FLUX, or DALL-E.")
-                        gr.Markdown(f"#### 🎨 AI Image Generation Prompts (Midjourney / DALL-E / FLUX) {_prompts_tooltip}")
+                        _prompts_tooltip = zast_tooltip("Pre-engineered AI prompts for creating custom cover illustrations and concept diagrams in Qwen-Image, Midjourney, or DALL-E.")
+                        gr.Markdown(f"#### 🎨 AI Image Generation Prompts (Ready to use in Tab 8 / Midjourney / DALL-E) {_prompts_tooltip}")
                         gr.Markdown(
                             "> 💡 **How to Use AI Image Prompts:**\n"
-                            "> - **Midjourney**: Copy the prompt, open Discord, and type `/imagine prompt:` followed by the copied text.\n"
-                            "> - **FLUX.1-schnell**: Paste directly into **Sub-Tab 3 (Thumbnail Studio)** to render a 4K visual in ~2 seconds.\n"
-                            "> - **DALL-E 3**: Paste directly into ChatGPT Plus / OpenAI DALL-E 3.\n"
-                            "> All prompts are pre-engineered with professional 3D octane render, volumetric lighting, and aspect ratio tags."
+                            "> - **🎨 Qwen-Image-2.1**: Copy any prompt below and paste into **Tab 8 (🎨 Thumbnail Studio)** to generate instantly in local AI!\n"
+                            "> - **Midjourney**: Copy the prompt and type `/imagine prompt:` followed by the text.\n"
+                            "> - **DALL-E 3**: Paste directly into ChatGPT Plus / DALL-E 3."
                         )
                         blog_img_prompts_out = gr.Markdown(value="")
 
-                    with gr.Tab("⚡ 3. YouTube Thumbnail Studio (FLUX.1-schnell)"):
-                        gr.Markdown(f"### ⚡ AI YouTube Thumbnail Studio (FLUX.1-schnell) {zast_tooltip('12B flow transformer generating high-CTR 4K YouTube thumbnails in 4 steps (~2s) with custom 3D typography.')} <span class='zast-pill zast-pill-cyan'>12B Flow Transformer</span>")
-                        gr.Markdown(
-                            "> 💡 **FLUX.1-schnell Thumbnail Studio & A/B Testing Guide:**\n"
-                            "> - **⚡ Ultra-Fast 12B Flow Transformer**: Distilled 4-step generation (~2 seconds on RTX GPUs) producing ultra-clean 4K visuals.\n"
-                            "> - **🔤 3D Typography Syntax**: Put any title text in **single quotes** (e.g. `'AI TUTORIAL'` or `'HERMES AGENT'`) in your prompt. FLUX renders crisp, readable, styled 3D typography!\n"
-                            "> - **🎨 5 Curated Visual Presets**: Choose *Viral High-CTR* for YouTube thumbnails, *3D Isometric* for tech/software, or *Cinematic Studio* for premium courses.\n"
-                            "> - **🧪 1-Click A/B Testing**: Click `🧪 Generate 3 A/B Test Variants` to get 3 diverse angles ready for YouTube Studio's *'Test & Compare'* feature.\n"
-                            "> - **🛡️ 100% Anti-AI Sanitizer**: All images are automatically stripped of AI metadata, prompts, C2PA manifests, and EXIF tags before export.\n"
-                            "> - **⭐ 1-Click Blog Cover**: Click `⭐ Use for Blog Thumbnail (#1)` under any variant to set it as your featured article header in WordPress!"
-                        )
+                        with gr.Group(elem_classes=["zast-studio-card"]):
+                            with gr.Row():
+                                with gr.Column(scale=3):
+                                    gr.Markdown(
+                                        "### 🎨 Want Custom AI Thumbnails or 3D Text Artwork?\n"
+                                        "Open **[Tab 8 (🎨 Thumbnail Studio)]** right in the top navigation bar! "
+                                        "Powered by **Qwen-Image-2.1 (7B DiT)** for 3D typography, reference-conditioned editing, and 1-click YouTube A/B test packs."
+                                    )
+                                with gr.Column(scale=1):
+                                    btn_go_to_thumbnails = gr.Button("🎨 Open Thumbnail Studio (Tab 8)", variant="primary")
 
-                        _flux_mgmt_tooltip = zast_tooltip("• Install: Downloads the ~12 GB model weights into local models/flux cache.\n• Free VRAM: Unloads model from GPU back to RAM so other AI engines have full GPU memory.\n• Free Disk Space: Deletes weights folder from disk to recover ~12 GB storage.")
-                        gr.Markdown(f"#### 💾 Model Management & VRAM Control {_flux_mgmt_tooltip}")
-                        with gr.Group():
-                            flux_model_status = gr.Markdown(
-                                value=flux_studio.get_model_status()["status_text"]
+            with gr.Tab("8. 🎨 Thumbnail Studio", id="tab_thumbnails") as tab8:
+                with gr.Accordion("💡 Quick Guide & Options Explained (Tab 8: AI Visuals & Thumbnails)", open=False, elem_classes=["zast-tab-guide-accordion"]):
+                    gr.HTML(_get_tab_guide_html(8))
+
+                with gr.Group(elem_classes=["zast-studio-card"]):
+                    gr.Markdown(f"### 🎨 AI YouTube Thumbnail & Visuals Studio (Qwen-Image-2.1) {zast_tooltip('Generate eye-catching YouTube thumbnails and visuals with Qwen-Image-2.1 (7B DiT with native RGBA transparency).')} <span class='zast-pill zast-pill-cyan'>Qwen-Image-2.1</span> <span class='zast-pill zast-pill-purple'>7B DiT</span> <span class='zast-pill zast-pill-green'>Native RGBA</span>")
+                    gr.Markdown(
+                        "> 💡 **Generate high-CTR YouTube thumbnails, transparent stickers, and editorial graphics 100% locally.**\n"
+                        "> - **🔤 Crisp 3D Typography**: Put titles or keywords in double quotes (`'YOUR TITLE'`) for sharp, rendered 3D text.\n"
+                        "> - **🪟 Native RGBA Transparency**: Select *'Transparent RGBA (Sticker / Cutout)'* for clean transparent PNGs without background removal tools.\n"
+                        "> - **🧪 Custom A/B Testing Pack (1 to 3 Variants)**: Select custom styles or quick packs; right-side preview tabs dynamically sync to your selections and package into a ready-to-upload ZIP for YouTube Studio's *'Test & Compare'* tool.\n"
+                        "> - **🛡️ 100% Anti-AI Metadata Stripping**: All generative AI tags (EXIF, C2PA, prompts) are permanently erased on export."
+                    )
+
+                with gr.Accordion("⚠️ Hardware Advisory & VRAM Requirements (Low-Spec Machines)", open=False):
+                    gr.Markdown(
+                        "<div style='background:rgba(239, 68, 68, 0.12); border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 6px; margin: 5px 0;'>"
+                        "<strong style='color:#f87171; font-size:14px;'>⚠️ Hardware Notice (Qwen-Image-2.1):</strong><br>"
+                        "<span style='color:#f1f5f9; font-size:13px; line-height:1.5;'>"
+                        "• <b>Model Weight Size</b>: ~33 GB on disk.<br>"
+                        "• <b>Recommended Hardware</b>: NVIDIA GPU with <b>minimum 8 to 12 GB VRAM</b> and <b>32 GB System RAM</b> (for CPU offload).<br>"
+                        "• <b>Low-Spec Machines (4-6 GB VRAM / 16 GB RAM)</b>: Generation may be slow or encounter Out Of Memory (OOM) errors.<br>"
+                        "• <b>100% Optional Module</b>: All core ZastTranslate features (WhisperX transcription, translation, VoxCPM 2 voice dubbing, 9:16 Shorts) run with zero degradation <u>without</u> installing this model."
+                        "</span>"
+                        "</div>"
+                    )
+
+                with gr.Group(elem_classes=["zast-studio-card"]):
+                    _qwen_mgmt_tooltip = zast_tooltip("• Download: Fetches Qwen-Image-2.1 model weights (~33 GB).\n• Free VRAM: Flushes model weights from GPU to RAM.\n• Delete Weights: Deletes model files from disk to recover storage.")
+                    gr.Markdown(f"#### 💾 Model Management & VRAM Control {_qwen_mgmt_tooltip}")
+                    flux_model_status = gr.Markdown(
+                        value=qwen_image_studio.get_model_status()["status_text"]
+                    )
+                    with gr.Row():
+                        btn_install_flux = gr.Button("📥 Install / Download Qwen-Image-2.1 (~33 GB)", variant="secondary", scale=2)
+                        btn_unload_flux = gr.Button("🧹 Free VRAM (Unload)", variant="secondary", scale=1)
+                        btn_delete_flux = gr.Button("🗑️ Free Disk Space (Delete Weights)", variant="stop", scale=1)
+                    gr.Markdown("<small>💡 *Click 'Free VRAM' after generating images to release 100% of GPU memory for Whisper transcription or vocal dubbing.*</small>")
+
+                with gr.Row():
+                    with gr.Column(scale=5):
+                        with gr.Group(elem_classes=["zast-studio-card"]):
+                            gr.Markdown("#### 🎛️ 1. Visual Style & Prompt")
+                            flux_style_preset = gr.Dropdown(
+                                choices=[
+                                    "YouTube Viral High-CTR",
+                                    "Photorealistic Studio Shot",
+                                    "Travel & Scenic Adventure",
+                                    "Editorial Portrait & Creator",
+                                    "Culinary & Food Lifestyle",
+                                    "Business, Finance & News",
+                                    "Gaming & Epic Cinematic",
+                                    "Refined Typography Poster",
+                                    "3D Isometric & Tech Glow",
+                                    "Cyberpunk & Bold Neon",
+                                    "Minimalist & Clean SaaS",
+                                    "Transparent RGBA (Sticker / Cutout)"
+                                ],
+                                value=["YouTube Viral High-CTR"],
+                                multiselect=True,
+                                max_choices=3,
+                                label="🎨 Thumbnail & Visual Style Presets (Select 1 to 3 Variants for A/B Testing)",
+                                info="Select 1 style for a single image, or choose up to 3 variants for YouTube Studio A/B Test & Compare."
                             )
                             with gr.Row():
-                                btn_install_flux = gr.Button("📥 Install / Download FLUX.1-schnell (~12 GB)", variant="secondary", scale=2)
-                                btn_unload_flux = gr.Button("🧹 Free VRAM (Unload)", variant="secondary", scale=1)
-                                btn_delete_flux = gr.Button("🗑️ Free Disk Space (Delete Weights)", variant="stop", scale=1)
-                            gr.Markdown("<small>💡 *FLUX.1-schnell requires ~12 GB VRAM on GPU. Click 'Free VRAM (Unload)' when finished so Whisper or TTS voice cloning have full GPU headroom.*</small>")
+                                btn_preset_viral3 = gr.Button("🧪 Standard 3-Pack", variant="secondary", size="sm", scale=1)
+                                btn_preset_travel = gr.Button("🌍 Travel & Adventure", variant="secondary", size="sm", scale=1)
+                                btn_preset_tech = gr.Button("💻 Tech & Neon", variant="secondary", size="sm", scale=1)
+                                btn_preset_saas = gr.Button("✨ Clean SaaS", variant="secondary", size="sm", scale=1)
+                            flux_prompt = gr.Textbox(
+                                label="🎨 Prompt (Wrap words in quotes for 3D typography: e.g. 'YOUR TITLE')",
+                                lines=4,
+                                placeholder="E.g.: A high-CTR YouTube thumbnail with bold 3D glowing letters that read 'AI TUTORIAL', vibrant electric cyan and warm amber lighting, dark modern tech studio background, 8k resolution...",
+                                interactive=True,
+                                info="Visual scene description. Put words in double quotes for 3D typography. Select 'Transparent RGBA' preset for transparent PNG."
+                            )
+                            btn_enhance_prompt = gr.Button("✨ AI Prompt Assistant (Qwen-Image Style & 3D Typography)", elem_id="btn_ai_prompt_assistant", variant="primary")
+                            gr.Markdown("<small>💡 *Click <b>AI Prompt Assistant</b> to auto-expand your idea into a high-CTR prompt. Automatically integrates your <b>Reference Photo</b> (speaker face / product) and pulls your <b>SEO Title from Tab 7</b> or imported video.*</small>")
 
-                        with gr.Row():
-                            with gr.Column(scale=5):
-                                with gr.Group():
-                                    flux_style_preset = gr.Dropdown(
-                                        choices=[
-                                            "YouTube Viral High-CTR",
-                                            "3D Isometric & Tech Glow",
-                                            "Cyberpunk & Bold Neon",
-                                            "Minimalist & Clean SaaS",
-                                            "Photorealistic Studio Shot"
-                                        ],
-                                        value="YouTube Viral High-CTR",
-                                        label="🎨 Thumbnail Visual Style Preset",
-                                        info="Curated aesthetic presets tuned for high click-through rate (CTR)."
-                                    )
-                                    flux_prompt = gr.Textbox(
-                                        label="🎨 FLUX.1-schnell Prompt (Put text in quotes for bold 3D typography: e.g. 'YOUR TITLE')",
-                                        lines=4,
-                                        placeholder="E.g.: Viral YouTube thumbnail for Hermes Agent, bold 3D glowing neon typography with text 'TUTO WINDOWS', vibrant electric cyan and warm amber lighting, 8k render...",
-                                        interactive=True,
-                                        info="Visual scene description. Put words in single quotes (e.g. 'SECRET REVEALED') for 3D typography."
-                                    )
-                                    btn_enhance_prompt = gr.Button("✨ AI Prompt Assistant (Expand & Add Catchy 3D Typography)", elem_id="btn_ai_prompt_assistant", variant="primary")
-                                    gr.Markdown("<small>💡 *Click AI Prompt Assistant to automatically expand your idea into a viral high-CTR prompt with 3D text syntax (single quotes '...').*</small>")
-
-                                with gr.Group():
-                                    with gr.Row():
-                                        flux_aspect = gr.Radio(
-                                            choices=["16:9 (YouTube & Blog)", "9:16 (Shorts & Reels)", "1:1 (Square)"],
-                                            value="16:9 (YouTube & Blog)",
-                                            label="📐 Aspect Ratio",
-                                            info="16:9 for YouTube & Blog; 9:16 for Shorts & Reels; 1:1 for Square."
-                                        )
-                                        flux_steps = gr.Radio(
-                                            choices=["4 steps (Fast / ~2s)", "6 steps (Balanced)", "8 steps (High Detail)"],
-                                            value="4 steps (Fast / ~2s)",
-                                            label="⚡ Diffusion Steps",
-                                            info="4 steps is distilled for ultra-fast generation (~2s)."
-                                        )
-                                    with gr.Row():
-                                        flux_seed = gr.Number(
-                                            value=-1,
-                                            label="🎲 Generation Seed (-1 = Random)",
-                                            precision=0,
-                                            scale=2,
-                                            info="Leave at -1 for a unique image on every run, or set a fixed number to reproduce."
-                                        )
-                                        btn_random_seed = gr.Button("🎲 Reset to Random (-1)", variant="secondary", scale=1)
-
-                                with gr.Group():
-                                    flux_ref_img = gr.Image(
-                                        label="👤 Optional Reference Photo (Speaker Face / Product / Keyframe)",
-                                        type="filepath",
-                                        height=190,
-                                        interactive=True
-                                    )
-                                    gr.Markdown("<small>💡 *Leave empty for pure Text-to-Image, or upload a photo to preserve face identity or product composition.*</small>")
-
-                                _run_flux_ab_tooltip = zast_tooltip("• Generate Single: Renders 1 thumbnail with the active preset in ~2-4s.\n• Generate 3 A/B Variants: Generates 3 distinct high-CTR styles (Viral, 3D Tech, Cinematic) for YouTube Studio's Test & Compare.")
-                                gr.Markdown(f"#### 🚀 Generation Actions {_run_flux_ab_tooltip}")
+                        with gr.Group(elem_classes=["zast-studio-card"]):
+                            gr.Markdown("#### 📐 2. Format & Reference")
+                            flux_aspect = gr.Radio(
+                                choices=["16:9 (YouTube & Blog)", "9:16 (Shorts & Reels)", "1:1 (Square)", "4:3 (Classic)"],
+                                value="16:9 (YouTube & Blog)",
+                                label="📐 Aspect Ratio",
+                                info="16:9 (1376x768); 9:16 (768x1376); 1:1 (1024x1024); 4:3 (1200x896)."
+                            )
+                            flux_ref_img = gr.Image(
+                                label="👤 Optional Reference Photo (Speaker Face / Product / Keyframe)",
+                                type="filepath",
+                                height=180,
+                                interactive=True
+                            )
+                            gr.Markdown("<small>💡 *Leave empty for pure Text-to-Image, or upload an image for reference-conditioned composition.*</small>")
+                            with gr.Accordion("⚙️ Advanced Settings (Steps, CFG Quality & Seed)", open=False):
+                                flux_steps = gr.Radio(
+                                    choices=["30 steps (Fast)", "40 steps (Standard / Recommended)", "50 steps (High Detail)"],
+                                    value="40 steps (Standard / Recommended)",
+                                    label="⚡ Diffusion Steps (Qwen-Image DiT)",
+                                    info="40 steps recommended for optimal balance between speed and quality."
+                                )
                                 with gr.Row():
-                                    btn_run_flux = gr.Button("🚀 Generate Single Thumbnail", variant="secondary", scale=2)
-                                    btn_run_flux_ab = gr.Button("🧪 Generate 3 A/B Test Variants (1-Click)", variant="primary", scale=3)
-                                gr.Markdown("<small>💡 *Fast 4-step generation (~2-4s on RTX GPU). AI metadata, EXIF, and C2PA are automatically 100% stripped from all outputs.*</small>")
-                                
-                                flux_status = gr.Markdown(value="")
-
-                            with gr.Column(scale=7):
-                                with gr.Group():
-                                    _ab_tooltip = zast_tooltip("3 distinct visual styles ready for YouTube Studio Test & Compare. All metadata is stripped.")
-                                    gr.Markdown(f"### 🧪 YouTube A/B Test Studio (3 Diverse Variants for High CTR) {_ab_tooltip}")
-                                    with gr.Tabs(elem_id="flux_variant_tabs") as flux_variant_tabs:
-                                        with gr.Tab("🅰️ Variant A : Viral High-CTR", id="tab_variant_a") as tab_variant_a:
-                                            flux_thumb_a = gr.Image(label="Variant A (Viral)", height=300, interactive=False)
-                                            with gr.Row():
-                                                btn_apply_a = gr.Button("⭐ Use for Blog Thumbnail (#1)", variant="secondary", scale=2)
-                                                file_down_a = gr.File(label="⬇️ Download Sanitized PNG A", scale=2, interactive=False)
-                                            gr.Markdown("<small>💡 *Click 'Use for Blog Thumbnail' to assign this image as Keyframe #1 in the WordPress export pack.*</small>")
-                                        with gr.Tab("🅱️ Variant B : 3D Tech Glow", id="tab_variant_b") as tab_variant_b:
-                                            flux_thumb_b = gr.Image(label="Variant B (Tech)", height=300, interactive=False)
-                                            with gr.Row():
-                                                btn_apply_b = gr.Button("⭐ Use for Blog Thumbnail (#1)", variant="secondary", scale=2)
-                                                file_down_b = gr.File(label="⬇️ Download Sanitized PNG B", scale=2, interactive=False)
-                                            gr.Markdown("<small>💡 *Click 'Use for Blog Thumbnail' to assign this image as Keyframe #1 in the WordPress export pack.*</small>")
-                                        with gr.Tab("🅲 Variant C : Cinematic Studio", id="tab_variant_c") as tab_variant_c:
-                                            flux_thumb_c = gr.Image(label="Variant C (Studio)", height=300, interactive=False)
-                                            with gr.Row():
-                                                btn_apply_c = gr.Button("⭐ Use for Blog Thumbnail (#1)", variant="secondary", scale=2)
-                                                file_down_c = gr.File(label="⬇️ Download Sanitized PNG C", scale=2, interactive=False)
-                                            gr.Markdown("<small>💡 *Click 'Use for Blog Thumbnail' to assign this image as Keyframe #1 in the WordPress export pack.*</small>")
-
-                                    with gr.Row():
-                                        flux_ab_zip = gr.File(label="📦 Download Complete A/B Testing ZIP Pack (3 PNGs + Instructions)", scale=3, interactive=False)
-                                        btn_open_flux_folder = gr.Button("📂 Open Folder", variant="secondary", scale=1)
-                                    gr.Markdown("<small>💡 *The Complete A/B Testing ZIP Pack contains all 3 sanitized PNGs and a guide for uploading directly into YouTube Studio's 'Test & Compare' feature.*</small>")
-
-                                    gr.Markdown(
-                                        "🛡️ **Anti-AI Detection Sanitizer**: All 3 thumbnails have their AI metadata (EXIF, prompts, C2PA, PNG text chunks) "
-                                        "**100% stripped** on save. Ready to drag & drop directly into YouTube Studio's *'Test & Compare'* A/B testing tool!"
+                                    flux_cfg = gr.Slider(
+                                        minimum=1.0,
+                                        maximum=6.0,
+                                        value=1.0,
+                                        step=0.5,
+                                        label="🎯 Guidance Scale (CFG)",
+                                        info="1.0 = Default sampling. 2.0 to 3.5 = Stronger prompt fidelity, richer contrast & crisp typography.",
+                                        scale=2
                                     )
+                                    flux_seed = gr.Number(
+                                        value=-1,
+                                        label="🎲 Generation Seed (-1 = Random)",
+                                        precision=0,
+                                        scale=2,
+                                        info="Leave at -1 for random seed, or set fixed number to reproduce."
+                                    )
+                                    btn_random_seed = gr.Button("🎲 Random (-1)", variant="secondary", scale=1)
+                                flux_negative = gr.Textbox(
+                                    label="🚫 Negative Prompt (Active when CFG > 1.0)",
+                                    value="blurry, low quality, distorted, deformed, lowres, bad typography, artifacts, darkness, empty, oversaturated",
+                                    lines=2,
+                                    info="Elements to suppress during generation (only applied when CFG is set above 1.0)."
+                                )
+
+                        with gr.Accordion("💡 1-Click Official Prompt Showcase (Alibaba Examples)", open=False):
+                            gr.Examples(
+                                examples=[
+                                    [
+                                        'The image is an expansive, cinematic travel documentary photograph of a breathtaking natural landscape during golden hour. In the lower third, prominent embossed natural stone typography reads "ROAD TRIP ICELAND". In the center, a scenic panoramic viewpoint overlooks majestic rugged mountain peaks and a winding coastal highway bordering deep turquoise ocean waters. A solitary adventurer wearing outdoor trekking gear stands admiring the sweeping vista. Shot on a 24mm wide-angle prime lens at f/8 with edge-to-edge optical sharpness and rich natural earth tones.',
+                                        ["Travel & Scenic Adventure"],
+                                        "16:9 (YouTube & Blog)"
+                                    ],
+                                    [
+                                        'Create an editorial portrait of a contemporary digital creator at a modern studio desk, surrounded by reference audio monitors and warm ambient lighting. Natural skin texture with visible micro-pores, believable skin tones, linen clothing, soft morning backlight, subtle film grain, medium-format photography, calm confident expression. In the foreground, bespoke wooden typography reads "CREATOR MASTERCLASS". Shot with an 85mm prime lens at f/1.8, shallow depth of field, circular bokeh, no watermark.',
+                                        ["Editorial Portrait & Creator"],
+                                        "16:9 (YouTube & Blog)"
+                                    ],
+                                    [
+                                        'Design a refined travel poster for a fictional night train. Render the headline exactly as "THE MIDNIGHT EXPRESS" and the subtitle "A journey under the stars". A silver train curves through dark blue mountains beneath a crescent moon. Art Deco geometry, ivory and gold lettering, clear typographic hierarchy, generous margins, print-ready composition.',
+                                        ["Refined Typography Poster"],
+                                        "16:9 (YouTube & Blog)"
+                                    ],
+                                    [
+                                        'The image is an inviting culinary editorial photograph of an artisanal gourmet dish. In the lower center, handwritten slate typography reads "HANDMADE RAMEN". In the center, a masterfully plated ramen bowl rests on a dark rustic wood table, with fresh herbs, soft-boiled egg, and delicate steam rising into the air. Soft morning window light from the left highlights the succulent textures and rich colors with gentle contact shadows. Shot with a 50mm macro lens at f/2.2.',
+                                        ["Culinary & Food Lifestyle"],
+                                        "16:9 (YouTube & Blog)"
+                                    ],
+                                    [
+                                        'The image is an authoritative, high-impact editorial photograph for a business and finance documentary. In the center, bold modern typography in brushed gold and deep charcoal reads "GLOBAL MARKET 2026". In the background, a sleek corporate boardroom overlooks a twilight city skyline with floating translucent financial trend cards. Shot on a 35mm lens with professional documentary framing.',
+                                        ["Business, Finance & News"],
+                                        "16:9 (YouTube & Blog)"
+                                    ],
+                                    [
+                                        'The image is a high-energy cinematic action illustration of an epic fantasy-sci-fi battlefront. In the center, massive battle-worn metallic 3D typography reads "BOSS FIGHT GUIDE" with glowing fiery embers and molten cracks. An armored warrior overlooks a dramatic battlefield shrouded in volumetric mist and dynamic sparks.',
+                                        ["Gaming & Epic Cinematic"],
+                                        "16:9 (YouTube & Blog)"
+                                    ],
+                                    [
+                                        'The image is a wide cinematic high-CTR YouTube thumbnail of a futuristic AI video translation workstation. In the center, prominent embossed 3D brushed titanium typography reads "ZAST TRANSLATE 1.21" with sharp bevelled edges and glowing neon borders. Floating translucent glass cards display audio waveforms. Electric cyan key light from the left and golden amber rim light create dramatic volumetric depth.',
+                                        ["YouTube Viral High-CTR"],
+                                        "16:9 (YouTube & Blog)"
+                                    ],
+                                    [
+                                        'This is an RGBA image with transparency. The image has alpha channel and the background is completely transparent. In the center of the frame is a standalone 3D graphic emblem featuring bold, glossy embossed typography that reads "AI DUBBING PRO" with bevelled metallic chrome borders, vibrant gradient fill, and crisp edge highlights.',
+                                        ["Transparent RGBA (Sticker / Cutout)"],
+                                        "1:1 (Square)"
+                                    ]
+                                ],
+                                inputs=[flux_prompt, flux_style_preset, flux_aspect],
+                                label="Click an example to load it instantly into your prompt & settings"
+                            )
+
+                        with gr.Group(elem_classes=["zast-studio-card"]):
+                            _run_flux_ab_tooltip = zast_tooltip("• Generate Single: Renders 1 visual/thumbnail with active preset.\n• Generate 3 A/B Variants: Generates 3 diverse styles (Viral, 3D Tech, Cinematic) for YouTube Studio Test & Compare.")
+                            gr.Markdown(f"#### 🚀 3. Generation Actions {_run_flux_ab_tooltip}")
+                            with gr.Row():
+                                btn_run_flux = gr.Button("🚀 Generate Single Visual", variant="secondary", scale=2)
+                                btn_run_flux_ab = gr.Button("🧪 Generate 3 A/B Test Variants (1-Click)", variant="primary", scale=3)
+                            gr.Markdown("<small>💡 *All generative AI metadata, EXIF, and C2PA markers are 100% stripped from output files.*</small>")
+                            flux_status = gr.Markdown(value="")
+
+                    with gr.Column(scale=7):
+                        with gr.Group(elem_classes=["zast-studio-card"]):
+                            _ab_tooltip = zast_tooltip("3 distinct visual styles ready for YouTube Studio Test & Compare. All metadata is stripped.")
+                            gr.Markdown(f"### 🖼️ Visual Output & YouTube A/B Studio {_ab_tooltip}")
+                            with gr.Tabs(elem_id="flux_variant_tabs") as flux_variant_tabs:
+                                with gr.Tab("🅰️ Variant A : Viral High-CTR", id="tab_variant_a") as tab_variant_a:
+                                    flux_thumb_a = gr.Image(label="Variant A (Viral)", height=320, interactive=False)
+                                    with gr.Row():
+                                        btn_apply_a = gr.Button("⭐ Use for Blog Thumbnail (#1)", variant="secondary", scale=2)
+                                        file_down_a = gr.File(label="⬇️ Download Sanitized PNG A", scale=2, interactive=False)
+                                    gr.Markdown("<small>💡 *Click 'Use for Blog Thumbnail' to assign this image as Keyframe #1 in Tab 7 (Blog Studio).*</small>")
+                                with gr.Tab("🅱️ Variant B : 3D Tech Glow", id="tab_variant_b") as tab_variant_b:
+                                    flux_thumb_b = gr.Image(label="Variant B (Tech)", height=320, interactive=False)
+                                    with gr.Row():
+                                        btn_apply_b = gr.Button("⭐ Use for Blog Thumbnail (#1)", variant="secondary", scale=2)
+                                        file_down_b = gr.File(label="⬇️ Download Sanitized PNG B", scale=2, interactive=False)
+                                    gr.Markdown("<small>💡 *Click 'Use for Blog Thumbnail' to assign this image as Keyframe #1 in Tab 7 (Blog Studio).*</small>")
+                                with gr.Tab("🅲 Variant C : Cinematic Studio", id="tab_variant_c") as tab_variant_c:
+                                    flux_thumb_c = gr.Image(label="Variant C (Studio)", height=320, interactive=False)
+                                    with gr.Row():
+                                        btn_apply_c = gr.Button("⭐ Use for Blog Thumbnail (#1)", variant="secondary", scale=2)
+                                        file_down_c = gr.File(label="⬇️ Download Sanitized PNG C", scale=2, interactive=False)
+                                    gr.Markdown("<small>💡 *Click 'Use for Blog Thumbnail' to assign this image as Keyframe #1 in Tab 7 (Blog Studio).*</small>")
+
+                            with gr.Row():
+                                flux_ab_zip = gr.File(label="📦 Download Complete A/B Testing ZIP Pack (3 PNGs + Guide)", scale=3, interactive=False)
+                                btn_open_flux_folder = gr.Button("📂 Open Folder in Explorer", variant="secondary", scale=1)
+                            gr.Markdown("<small>💡 *The Complete A/B Testing ZIP Pack contains all 3 sanitized PNGs and a guide for uploading directly into YouTube Studio's 'Test & Compare' feature.*</small>")
+
+                            gr.Markdown(
+                                "🛡️ **Anti-AI Detection Sanitizer**: All 3 thumbnails have their AI metadata (EXIF, prompts, C2PA, PNG text chunks) "
+                                "**100% stripped** on save. Ready to drag & drop directly into YouTube Studio's *'Test & Compare'* A/B testing tool!"
+                            )
         
-            with gr.Tab("ℹ️ Help", id="tab_help") as tab8:
+            with gr.Tab("ℹ️ Help", id="tab_help") as tab_help:
                 gr.Markdown("## How to use ZastTranslate")
                 
                 with gr.Accordion("📺 Preview & Subtitles (Left Column)", open=True):
@@ -5087,27 +5246,42 @@ with gr.Blocks(title="ZastTranslate") as app:
                         "- **🔄 Live 1-Click Humanizer Rule Sync** — Click `🔄 Sync Anti-AI Rules (Humanizer GitHub)` to fetch and cache the latest rules and watch words directly from GitHub.\n"
                         "- **🔍 Live Google & YouTube Keyword Discovery** — Queries Google Autocomplete in real-time without API keys, weaving high-intent search terms into H1, intro paragraphs, and subheadings.\n"
                         "- **🎯 Full SEO Pack & Meta Description** — Generates High-CTR H1 Title, calibrated Meta Description (145-160 chars), clean URL slug, focus keyword, and LSI secondary keywords.\n"
-                        "- **📸 Interactive Keyframes & Custom Thumbnail Studio** — Captures HD screenshots from key video timestamps (FFmpeg), allows **drag-and-drop custom thumbnail uploads**, generates contextual SEO ALT tags, provides ready-to-use **AI Image Generation Prompts** (Midjourney, DALL-E, Flux, SenseNova), and opens the image folder in 1-click (`📂 Open Images Folder in Windows Explorer`).\n"
-                        "- **📋 1-Click WordPress Gutenberg Export** — Outputs both Markdown and native WordPress Gutenberg block comments (`<!-- wp:heading -->`, `<!-- wp:paragraph -->`, `<!-- wp:list -->`, `<!-- wp:quote -->`, `<!-- wp:code -->`) ready to paste directly into the WordPress Code Editor, and packages everything into `blog_pack_wordpress.zip`."
+                        "- **📸 Interactive Keyframes (FFmpeg)** — Captures HD screenshots from key video timestamps with Lanczos scaling and text/code unsharp sharpening, generates contextual SEO ALT tags, and packages everything in 1-click into `blog_pack_wordpress.zip`.\n"
+                        "- **📋 1-Click WordPress Gutenberg Export** — Outputs both Markdown and native WordPress Gutenberg block comments (`<!-- wp:heading -->`, `<!-- wp:paragraph -->`, `<!-- wp:list -->`, `<!-- wp:quote -->`, `<!-- wp:code -->`) ready to paste directly into the WordPress Code Editor, and packages everything into `blog_pack_wordpress.zip`.\n"
+                        "- **🎨 Bridge to Tab 8 (Thumbnail Studio)** — Direct 1-click button to open Tab 8 to generate custom AI thumbnails, stickers, or A/B testing variants."
                     )
 
-                with gr.Accordion("⚡ Tab 7 — YouTube Thumbnail Studio (FLUX.1-schnell & A/B Testing)", open=False):
+                with gr.Accordion("🎨 Tab 8 — YouTube Thumbnail & Visuals Studio (Qwen-Image-2.1)", open=False):
                     gr.Markdown(
-                        "### ⚡ AI-Powered 4K YouTube Thumbnail Studio (FLUX.1-schnell)\n\n"
-                        "ZastTranslate integrates the state-of-the-art **FLUX.1-schnell** 12-billion parameter Flow Transformer model by Black Forest Labs to generate eye-catching, high-converting 16:9 YouTube thumbnails in ~2 seconds.\n\n"
+                        "### 🎨 AI YouTube Thumbnail & Visuals Studio (Qwen-Image-2.1)\n\n"
+                        "ZastTranslate integrates **Qwen-Image-2.1**, Alibaba's unified 7B single-stream DiT model, to generate high-CTR 16:9 / 9:16 YouTube thumbnails, 3D text typography, reference-conditioned editing, and native transparent RGBA cutouts 100% locally.\n\n"
                         "#### 🔑 Key Features & Capabilities:\n"
-                        "- **⚡ Ultra-Fast 4-Step Distilled Diffusion** — Optimized for consumer NVIDIA GPUs (RTX 3060/3080/4090). Generates full 1280x720 (16:9), 720x1280 (9:16), or 1024x1024 (1:1) visuals in ~2 seconds.\n"
-                        "- **🔤 Flawless 3D Typography** — Unlike older diffusion models that generate garbled text, FLUX.1 has native text-rendering capabilities. Simply surround your text with single quotes (e.g., `'HERMES AGENT'` or `'PYTHON TUTORIAL'`) to generate crisp, styled 3D typography embedded in the scene.\n"
-                        "- **🎨 5 Visual Style Presets**:\n"
+                        "- **🎨 Unified 7B DiT Architecture** — Combines text-to-image and reference image conditioning into a single unified pipeline.\n"
+                        "- **🔤 3D Typography Rendering** — Wrap words or titles in double quotes (e.g., `'AI TUTORIAL'` or `'ZAST TRANSLATE 1.21'`) for razor-sharp, physically rendered 3D text (version dots and punctuation preserved).\n"
+                        "- **🪟 Native RGBA Transparency** — Select *'Transparent RGBA (Sticker / Cutout)'* preset to produce transparent PNGs with alpha channel without needing third-party clipping tools.\n"
+                        "- **🎨 Curated Style Presets (Official Alibaba Qwen-Image-2.1 PE Framework)**:\n"
                         "  - `YouTube Viral High-CTR`: Vibrant contrasting colors (electric cyan and warm amber), expressive lighting, bold dramatic depth.\n"
+                        "  - `Photorealistic Studio Shot`: Commercial studio photography, 85mm prime lens at f/1.8, realistic textures, physical typography, and overhead softbox diffusion.\n"
+                        "  - `Travel & Scenic Adventure`: Expansive travel documentary photography, 24mm wide-angle, majestic golden hour landscape, natural textures, and organic stone/wood typography.\n"
+                        "  - `Editorial Portrait & Creator`: Medium-format creator workspace portrait, natural skin textures with micro-pores, linen fabric, morning backlight, and subtle film grain.\n"
+                        "  - `Culinary & Food Lifestyle`: Mouthwatering commercial food photography, 50mm macro, artisanal gourmet plating, fresh ingredients, and natural window lighting.\n"
+                        "  - `Business, Finance & News`: Authoritative financial/business editorial documentary, modern boardroom skyline at twilight, upward data trends, and polished gold/charcoal typography.\n"
+                        "  - `Gaming & Epic Cinematic`: High-energy action gaming scene, battle-hardened warrior, chiseled fiery metallic 3D typography, volumetric smoke, and celestial energy beams.\n"
+                        "  - `Refined Typography Poster`: Art Deco geometric typography poster, ivory and champagne gold lettering with strict hierarchy, and clean negative space.\n"
                         "  - `3D Isometric & Tech Glow`: Clean isometric 3D models with neon accents, soft shadows, and modern tech aesthetic.\n"
                         "  - `Cyberpunk & Bold Neon`: High-contrast dark backgrounds with vivid neon glow, volumetric smoke, and futuristic elements.\n"
                         "  - `Minimalist & Clean SaaS`: Elegant editorial design, subtle gradients, lots of clean negative space.\n"
-                        "  - `Photorealistic Studio Shot`: Cinematic depth of field (f/1.8), realistic skin tones, professional 3-point studio lighting.\n"
-                        "- **🧪 1-Click YouTube A/B Testing Suite** — Click `🧪 Generate 3 A/B Test Variants` to produce 3 fundamentally distinct thumbnail angles (Variant A: Viral High-CTR, Variant B: 3D Tech Glow, Variant C: Cinematic Studio). Download the complete pack as a ZIP ready to upload directly into YouTube Studio's *'Test & Compare'* A/B testing tool.\n"
-                        "- **🛡️ Automatic Anti-AI Metadata Stripping** — Automatically removes all generative AI metadata (EXIF tags, PNG tEXt/iTXt prompt chunks, C2PA manifests) so files are 100% clean and compliant.\n"
-                        "- **⭐ 1-Click Blog Cover Integration** — Click `⭐ Use for Blog Thumbnail (#1)` under any variant to immediately assign it as the featured cover image in the WordPress export pack.\n"
-                        "- **🧹 Dynamic VRAM Management** — Click `🧹 Free VRAM (Unload)` at any time to flush model weights from GPU memory before assembling videos in Tab 4."
+                        "  - `Transparent RGBA (Sticker / Cutout)`: Clean alpha cutout with zero background.\n"
+                        "- **✨ Smart AI Prompt Assistant (Official Alibaba 8-Step Observer Framework)** — Click *'✨ AI Prompt Assistant'* to expand brief concepts into high-CTR visual prompts. The assistant writes natural observer descriptions, specifies spatial anchors (*In the center, To the left, In the lower third*), defines physical materials (*brushed titanium, dark walnut, frosted glass*), and eliminates banned buzzwords (*'8K', 'masterpiece'*).\n"
+                        "  - *Prompt Typed*: If you type words or a partial idea, it emphasizes your keywords in 3D typography (`\"YOUR KEYWORDS\"`) and designs a full matching scene.\n"
+                        "  - *From Blog Studio (Tab 7)*: If the prompt box is empty and you generated a blog article in Tab 7, it automatically adopts the **SEO Focus Keyword / H1 Title** to create a thumbnail perfectly matching your post.\n"
+                        "  - *From Imported Video (Tab 1)*: If the prompt box is empty and no blog post exists, it cleans your imported video title (*removes filler words like 'tuto', 'guide', 'how-to'*) and crafts 3D text from the core topic.\n"
+                        "  - *Empty State*: If no video or blog exists, it provides a clean, production-ready template with generic `'AI TUTORIAL'` text.\n"
+                        "- **⚡ Diffusion Steps & CFG Guidance Scale**: Full support for 40 steps (DiT convergence standard) and Guidance Scale (CFG 1.0 to 6.0) with automatic negative prompting when CFG > 1.0 for crisper text edges and richer contrast.\n"
+                        "- **🧪 Custom YouTube A/B Testing Studio (1 to 3 Selected Variants)** — Choose up to 3 custom aesthetic presets from the dropdown or click a quick pack (Standard 3-Pack, Travel & Adventure, Tech & Neon, Clean SaaS). Preview tabs dynamically match your chosen styles in real time. Click `🧪 Generate A/B Test Variants` to render all selected variants and download a ready-to-upload ZIP pack with guide for YouTube Studio's *'Test & Compare'* tool.\n"
+                        "- **🛡️ Automatic Anti-AI Metadata Stripping** — Automatically removes all generative AI metadata (EXIF tags, PNG tEXt/iTXt prompt chunks, C2PA manifests) so files are 100% clean and human-crafted.\n"
+                        "- **⭐ 1-Click Blog Cover Integration** — Click `⭐ Use for Blog Thumbnail (#1)` under any variant to immediately assign it as the featured cover image in Tab 7 (Blog Studio).\n"
+                        "- **🧹 Dynamic VRAM Management** — Click `🧹 Free VRAM (Unload)` at any time to flush model weights from GPU memory."
                     )
         
                 with gr.Accordion("🔧 Troubleshooting", open=False):
@@ -5166,7 +5340,7 @@ with gr.Blocks(title="ZastTranslate") as app:
                         "- 🎵 [Demucs](https://github.com/facebookresearch/demucs) — State-of-the-art vocal isolation by Meta AI."
                     )
         
-            with gr.Tab("⚙️ CPS", id="tab_cps") as tab9:
+            with gr.Tab("⚙️ CPS", id="tab_cps") as tab_cps:
                 with gr.Accordion("💡 Quick Guide & Options Explained (Tab 9: Voice Speed CPS)", open=False, elem_classes=["zast-tab-guide-accordion"]):
                     gr.HTML(_get_tab_guide_html(9))
                 gr.Markdown(
@@ -5427,7 +5601,8 @@ with gr.Blocks(title="ZastTranslate") as app:
     )
     btn_export_video.click(export_video, [], [synth_status, export_video_file])
     btn_export_audio.click(export_audio, [], [synth_status, export_audio_file])
-    btn_open_output_tab4.click(open_output_folder, [], [])
+    btn_open_output_tab4.click(open_output_folder, [], [output_status_tab4])
+    btn_clear_output_tab4.click(clear_output_folder, [], [output_status_tab4])
     
     btn_bulk_run.click(
         step5_bulk_run, 
@@ -5435,7 +5610,8 @@ with gr.Blocks(title="ZastTranslate") as app:
         [bulk_status_output, bulk_files_output, bulk_metadata_output],
         show_progress="full"
     )
-    btn_open_output.click(open_output_folder, [], [])
+    btn_open_output.click(open_output_folder, [], [output_status_tab5])
+    btn_clear_output_tab5.click(clear_output_folder, [], [output_status_tab5])
 
     # Tab 6: Viral Shorts Handlers
     for i in range(5):
@@ -5617,9 +5793,9 @@ with gr.Blocks(title="ZastTranslate") as app:
 
     btn_sync_humanizer.click(on_sync_humanizer, inputs=[], outputs=[humanizer_sync_status])
 
-    # FLUX.1-schnell Generative Handlers
+    # Qwen-Image-2.1 Generative Handlers
     def on_install_flux(progress=gr.Progress()):
-        progress(0.1, "Installing dependencies & downloading FLUX.1-schnell weights...")
+        progress(0.1, "Installing dependencies & downloading Qwen-Image-2.1 weights...")
         res = flux_studio.download_model_weights()
         return res.get("status_text")
 
@@ -5642,7 +5818,7 @@ with gr.Blocks(title="ZastTranslate") as app:
 
     def on_unload_flux():
         flux_studio.unload()
-        return "🧹 FLUX model unloaded from VRAM successfully! (GPU memory freed)"
+        return "🧹 Qwen-Image-2.1 model unloaded from VRAM successfully! (GPU memory freed)"
 
     btn_unload_flux.click(
         on_unload_flux,
@@ -5650,18 +5826,37 @@ with gr.Blocks(title="ZastTranslate") as app:
         outputs=[flux_status]
     )
 
-    def on_enhance_prompt(current_prompt, style_choice):
-        video_title = state.video_info.get("title", "") if state.video_info else ""
+    def on_enhance_prompt(current_prompt, style_choice, blog_title="", blog_focus_kw="", ref_img=None):
+        # Context Priority:
+        # 1. User input prompt (if user typed words or in-progress idea)
+        # 2. Blog Studio SEO Focus Keyword / H1 Title (if user generated blog post in Tab 7)
+        # 3. Tab 1 Video Title (if video imported)
+        # 4. Clean fallback "AI TUTORIAL"
+        context_title = ""
+        if blog_focus_kw and str(blog_focus_kw).strip():
+            context_title = str(blog_focus_kw).strip()
+        elif blog_title and str(blog_title).strip():
+            context_title = str(blog_title).strip()
+        elif state.video_info and state.video_info.get("title"):
+            context_title = str(state.video_info.get("title", "")).strip()
+
+        active_style = "YouTube Viral High-CTR"
+        if isinstance(style_choice, list) and style_choice:
+            active_style = str(style_choice[0]).strip()
+        elif isinstance(style_choice, str) and style_choice.strip():
+            active_style = str(style_choice).strip()
+
         enhanced = flux_studio.enhance_prompt(
             user_input=current_prompt,
-            video_title=video_title,
-            style_preset=style_choice
+            video_title=context_title,
+            style_preset=active_style,
+            reference_image_path=ref_img
         )
         return enhanced
 
     btn_enhance_prompt.click(
         on_enhance_prompt,
-        inputs=[flux_prompt, flux_style_preset],
+        inputs=[flux_prompt, flux_style_preset, blog_title_out, blog_focus_kw_out, flux_ref_img],
         outputs=[flux_prompt]
     )
 
@@ -5682,26 +5877,37 @@ with gr.Blocks(title="ZastTranslate") as app:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    def on_run_flux(prompt, ref_img, aspect_ratio, steps_choice, style_choice, seed_choice):
+    def on_run_flux(prompt, ref_img, aspect_ratio, steps_choice, style_choice, seed_choice, cfg_choice=1.0, neg_choice=""):
+        active_style = "YouTube Viral High-CTR"
+        if isinstance(style_choice, list) and style_choice:
+            active_style = str(style_choice[0]).strip()
+        elif isinstance(style_choice, str) and style_choice.strip():
+            active_style = str(style_choice).strip()
+
         if not prompt or not prompt.strip():
             return (
-                gr.update(), gr.update(), gr.update(),
-                gr.update(), gr.update(), gr.update(),
                 gr.update(), gr.update(),
-                "⚠️ Please enter a prompt or topic for FLUX.1-schnell."
+                gr.update(), gr.update(),
+                gr.update(), gr.update(),
+                gr.update(), gr.update(),
+                gr.update(),
+                "⚠️ Please enter a prompt or visual description for Qwen-Image-2.1."
             )
         
         free_vram_for_flux()
-        steps_val = 4
-        if "6" in str(steps_choice):
-            steps_val = 6
-        elif "8" in str(steps_choice):
-            steps_val = 8
+        # Parse actual diffusion steps from UI choice (e.g. "30 steps (Fast)", "40 steps (Standard / Recommended)", "50 steps (High Detail)")
+        steps_val = 40
+        match = re.search(r'(\d+)', str(steps_choice))
+        if match:
+            steps_val = int(match.group(1))
+
         aspect_val = "16:9"
         if "9:16" in str(aspect_ratio):
             aspect_val = "9:16"
         elif "1:1" in str(aspect_ratio):
             aspect_val = "1:1"
+        elif "4:3" in str(aspect_ratio):
+            aspect_val = "4:3"
 
         seed_val = None
         try:
@@ -5722,20 +5928,27 @@ with gr.Blocks(title="ZastTranslate") as app:
             tailored_prompt = flux_studio.enhance_prompt(
                 user_input=raw_prompt,
                 video_title=video_title,
-                style_preset=style_choice
+                style_preset=active_style,
+                reference_image_path=ref_img
             )
         else:
             # User typed custom prompt or quotes: preserve user's prompt
-            # Standardize quotes to double quotes for FLUX T5 tokenizer and strip accents
+            # Standardize single quotes to double quotes for Qwen3-VL tokenizer, keeping all numbers and dots
             formatted = re.sub(r"'(.*?)'", r'"\1"', raw_prompt)
             tailored_prompt = flux_studio.clean_ascii_typography(formatted)
+            if ref_img and os.path.exists(str(ref_img).strip()):
+                lower_p = tailored_prompt.lower()
+                if not any(k in lower_p for k in ["reference", "photo", "person", "face", "speaker", "creator", "subject"]):
+                    tailored_prompt = f"Featuring the person from the reference photo, preserving their exact facial features, hairstyle, and appearance from the reference image. {tailored_prompt}"
 
         res = flux_studio.generate_thumbnail(
             prompt=tailored_prompt,
             reference_image_path=ref_img,
             aspect_ratio=aspect_val,
             steps=steps_val,
-            seed=seed_val
+            seed=seed_val,
+            cfg_scale=float(cfg_choice) if cfg_choice is not None else 1.0,
+            negative_prompt=neg_choice
         )
 
         if res.get("success"):
@@ -5743,51 +5956,34 @@ with gr.Blocks(title="ZastTranslate") as app:
             used_seed = res.get("seed", "")
             status_msg = res.get("message", f"✅ Thumbnail generated! (Seed: {used_seed})")
 
-            # Route to appropriate tab and keep other tabs intact (never None)
-            style_str = str(style_choice).lower()
-            if "3d" in style_str or "tech" in style_str:
-                return (
-                    gr.update(selected="tab_variant_b"),
-                    gr.update(), gr.update(),
-                    img_path, img_path,
-                    gr.update(), gr.update(),
-                    gr.update(),
-                    status_msg
-                )
-            elif "photorealistic" in style_str or "studio" in style_str or "cinematic" in style_str:
-                return (
-                    gr.update(selected="tab_variant_c"),
-                    gr.update(), gr.update(),
-                    gr.update(), gr.update(),
-                    img_path, img_path,
-                    gr.update(),
-                    status_msg
-                )
-            else:
-                return (
-                    gr.update(selected="tab_variant_a"),
-                    img_path, img_path,
-                    gr.update(), gr.update(),
-                    gr.update(), gr.update(),
-                    gr.update(),
-                    status_msg
-                )
+            # Route to Variant A tab and update its label to match the chosen style
+            return (
+                gr.update(selected="tab_variant_a"),
+                gr.update(label=f"🅰️ Variant A : {active_style}"),
+                img_path, img_path,
+                gr.update(), gr.update(),
+                gr.update(), gr.update(),
+                gr.update(),
+                status_msg
+            )
         else:
             return (
                 gr.update(),
+                gr.update(),
                 gr.update(), gr.update(),
                 gr.update(), gr.update(),
                 gr.update(), gr.update(),
                 gr.update(),
-                res.get("message", "❌ Error generating FLUX image.")
+                res.get("message", "❌ Error generating image with Qwen-Image-2.1.")
             )
 
-    def on_run_flux_ab(prompt, ref_img, aspect_ratio, steps_choice, seed_choice, progress=gr.Progress()):
+    def on_run_flux_ab(prompt, ref_img, aspect_ratio, steps_choice, seed_choice, cfg_choice=1.0, neg_choice="", styles_choice=None, progress=gr.Progress()):
         video_title = state.video_info.get("title", "") if state.video_info else ""
         base_text = prompt.strip() if prompt and prompt.strip() else video_title
         if not base_text:
             return (
                 gr.update(),
+                gr.update(), gr.update(), gr.update(),
                 gr.update(), gr.update(),
                 gr.update(), gr.update(),
                 gr.update(), gr.update(),
@@ -5796,16 +5992,19 @@ with gr.Blocks(title="ZastTranslate") as app:
             )
 
         free_vram_for_flux()
-        steps_val = 4
-        if "6" in str(steps_choice):
-            steps_val = 6
-        elif "8" in str(steps_choice):
-            steps_val = 8
+        # Parse actual steps from UI choice
+        steps_val = 40
+        match = re.search(r'(\d+)', str(steps_choice))
+        if match:
+            steps_val = int(match.group(1))
+
         aspect_val = "16:9"
         if "9:16" in str(aspect_ratio):
             aspect_val = "9:16"
         elif "1:1" in str(aspect_ratio):
             aspect_val = "1:1"
+        elif "4:3" in str(aspect_ratio):
+            aspect_val = "4:3"
 
         seed_val = None
         try:
@@ -5817,6 +6016,12 @@ with gr.Blocks(title="ZastTranslate") as app:
         def prog_cb(pct, msg):
             progress(pct, msg)
 
+        selected_styles = []
+        if isinstance(styles_choice, list):
+            selected_styles = [str(s).strip() for s in styles_choice if str(s).strip()]
+        elif isinstance(styles_choice, str) and styles_choice.strip():
+            selected_styles = [styles_choice.strip()]
+
         res = flux_studio.generate_ab_thumbnails(
             base_prompt=base_text,
             video_title=video_title,
@@ -5824,7 +6029,10 @@ with gr.Blocks(title="ZastTranslate") as app:
             aspect_ratio=aspect_val,
             steps=steps_val,
             base_seed=seed_val,
-            progress_callback=prog_cb
+            progress_callback=prog_cb,
+            cfg_scale=float(cfg_choice) if cfg_choice is not None else 1.0,
+            negative_prompt=neg_choice,
+            styles_list=selected_styles if selected_styles else None
         )
 
         if res.get("success"):
@@ -5832,18 +6040,27 @@ with gr.Blocks(title="ZastTranslate") as app:
             img_a = variants[0]["image_path"] if len(variants) > 0 else None
             img_b = variants[1]["image_path"] if len(variants) > 1 else None
             img_c = variants[2]["image_path"] if len(variants) > 2 else None
+
+            label_a = f"🅰️ Variant A : {variants[0]['style']}" if len(variants) > 0 else "🅰️ Variant A"
+            label_b = f"🅱️ Variant B : {variants[1]['style']}" if len(variants) > 1 else "🅱️ Variant B : 3D Tech Glow"
+            label_c = f"🅲 Variant C : {variants[2]['style']}" if len(variants) > 2 else "🅲 Variant C : Cinematic Studio"
+
             zip_path = res.get("zip_path")
             return (
                 gr.update(selected="tab_variant_a"),
+                gr.update(label=label_a),
+                gr.update(label=label_b),
+                gr.update(label=label_c),
                 img_a, img_a,
-                img_b, img_b,
-                img_c, img_c,
+                img_b if img_b else gr.update(), img_b if img_b else gr.update(),
+                img_c if img_c else gr.update(), img_c if img_c else gr.update(),
                 zip_path,
                 res.get("message")
             )
         else:
             return (
                 gr.update(),
+                gr.update(), gr.update(), gr.update(),
                 gr.update(), gr.update(),
                 gr.update(), gr.update(),
                 gr.update(), gr.update(),
@@ -5853,37 +6070,67 @@ with gr.Blocks(title="ZastTranslate") as app:
 
     btn_run_flux.click(
         on_run_flux,
-        inputs=[flux_prompt, flux_ref_img, flux_aspect, flux_steps, flux_style_preset, flux_seed],
-        outputs=[flux_variant_tabs, flux_thumb_a, file_down_a, flux_thumb_b, file_down_b, flux_thumb_c, file_down_c, flux_ab_zip, flux_status],
+        inputs=[flux_prompt, flux_ref_img, flux_aspect, flux_steps, flux_style_preset, flux_seed, flux_cfg, flux_negative],
+        outputs=[flux_variant_tabs, tab_variant_a, flux_thumb_a, file_down_a, flux_thumb_b, file_down_b, flux_thumb_c, file_down_c, flux_ab_zip, flux_status],
         show_progress="full"
     )
 
     btn_run_flux_ab.click(
         on_run_flux_ab,
-        inputs=[flux_prompt, flux_ref_img, flux_aspect, flux_steps, flux_seed],
-        outputs=[flux_variant_tabs, flux_thumb_a, file_down_a, flux_thumb_b, file_down_b, flux_thumb_c, file_down_c, flux_ab_zip, flux_status],
+        inputs=[flux_prompt, flux_ref_img, flux_aspect, flux_steps, flux_seed, flux_cfg, flux_negative, flux_style_preset],
+        outputs=[flux_variant_tabs, tab_variant_a, tab_variant_b, tab_variant_c, flux_thumb_a, file_down_a, flux_thumb_b, file_down_b, flux_thumb_c, file_down_c, flux_ab_zip, flux_status],
         show_progress="full"
     )
 
     btn_random_seed.click(fn=lambda: -1, inputs=[], outputs=[flux_seed])
 
-    tab_variant_a.select(fn=lambda: "YouTube Viral High-CTR", inputs=[], outputs=[flux_style_preset])
-    tab_variant_b.select(fn=lambda: "3D Isometric & Tech Glow", inputs=[], outputs=[flux_style_preset])
-    tab_variant_c.select(fn=lambda: "Photorealistic Studio Shot", inputs=[], outputs=[flux_style_preset])
+    def on_style_preset_change(styles):
+        if isinstance(styles, str):
+            styles = [styles] if styles else []
+        styles = styles or ["YouTube Viral High-CTR"]
+        count = len(styles)
+        first_style = styles[0]
+        label_a = f"🅰️ Variant A : {first_style}" if count > 0 else "🅰️ Variant A"
+        label_b = f"🅱️ Variant B : {styles[1]}" if count > 1 else "🅱️ Variant B : 3D Tech Glow"
+        label_c = f"🅲 Variant C : {styles[2]}" if count > 2 else "🅲 Variant C : Cinematic Studio"
 
-    def on_style_preset_change(style):
-        style_str = str(style).lower()
-        if "3d" in style_str or "tech" in style_str:
-            return gr.update(selected="tab_variant_b")
-        elif "photorealistic" in style_str or "studio" in style_str or "cinematic" in style_str:
-            return gr.update(selected="tab_variant_c")
-        else:
-            return gr.update(selected="tab_variant_a")
+        short_name = first_style[:18] + "..." if len(first_style) > 18 else first_style
+        single_btn_text = f"🚀 Generate Visual (Variant A: {short_name})"
+        ab_btn_text = f"🧪 Generate {count} A/B Test Variant{'s' if count > 1 else ''} (1-Click)" if count > 1 else "🧪 Generate 3 A/B Test Variants (Default 3-Pack)"
+
+        return (
+            gr.update(label=label_a),
+            gr.update(label=label_b),
+            gr.update(label=label_c),
+            single_btn_text,
+            ab_btn_text
+        )
 
     flux_style_preset.change(
         on_style_preset_change,
         inputs=[flux_style_preset],
-        outputs=[flux_variant_tabs]
+        outputs=[tab_variant_a, tab_variant_b, tab_variant_c, btn_run_flux, btn_run_flux_ab]
+    )
+
+    btn_preset_viral3.click(
+        lambda: ["YouTube Viral High-CTR", "3D Isometric & Tech Glow", "Photorealistic Studio Shot"],
+        inputs=[],
+        outputs=[flux_style_preset]
+    )
+    btn_preset_travel.click(
+        lambda: ["Travel & Scenic Adventure", "Editorial Portrait & Creator", "Photorealistic Studio Shot"],
+        inputs=[],
+        outputs=[flux_style_preset]
+    )
+    btn_preset_tech.click(
+        lambda: ["3D Isometric & Tech Glow", "Cyberpunk & Bold Neon", "Minimalist & Clean SaaS"],
+        inputs=[],
+        outputs=[flux_style_preset]
+    )
+    btn_preset_saas.click(
+        lambda: ["Minimalist & Clean SaaS", "Refined Typography Poster", "Photorealistic Studio Shot"],
+        inputs=[],
+        outputs=[flux_style_preset]
     )
 
     btn_open_flux_folder.click(open_output_folder, [], [])
@@ -6090,7 +6337,7 @@ with gr.Blocks(title="ZastTranslate") as app:
         except Exception:
             return gr.update(), gr.update(), gr.update(), gr.update()
         
-    for tab in [tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9]:
+    for tab in [tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab_help, tab_cps]:
         tab.select(
             fn=on_tab_select,
             inputs=[],
@@ -6127,6 +6374,31 @@ with gr.Blocks(title="ZastTranslate") as app:
         inputs=None,
         outputs=[main_tabs],
         js="() => { window.zastSwitchTab('7.'); }"
+    )
+    btn_next_tab4_to_thumb.click(
+        fn=lambda: gr.Tabs(selected="tab_thumbnails"),
+        inputs=None,
+        outputs=[main_tabs],
+        js="() => { window.zastSwitchTab('8.'); }"
+    )
+    def on_go_to_thumbnails(current_prompt, blog_title, blog_focus_kw, style_choice):
+        tab_update = gr.Tabs(selected="tab_thumbnails")
+        if not current_prompt or not current_prompt.strip():
+            kw = str(blog_focus_kw).strip() if (blog_focus_kw and str(blog_focus_kw).strip()) else (str(blog_title).strip() if (blog_title and str(blog_title).strip()) else "")
+            if kw:
+                prefilled_prompt = flux_studio.enhance_prompt(
+                    user_input="",
+                    video_title=kw,
+                    style_preset=style_choice
+                )
+                return tab_update, prefilled_prompt
+        return tab_update, gr.update()
+
+    btn_go_to_thumbnails.click(
+        on_go_to_thumbnails,
+        inputs=[flux_prompt, blog_title_out, blog_focus_kw_out, flux_style_preset],
+        outputs=[main_tabs, flux_prompt],
+        js="() => { window.zastSwitchTab('8.'); }"
     )
 
     app.load(
