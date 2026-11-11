@@ -19,7 +19,7 @@ module.exports = {
           "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
         },
         message: [
-          "uv pip install \"git+https://github.com/huggingface/diffusers.git\" \"git+https://github.com/huggingface/transformers.git\" accelerate sentencepiece protobuf pillow huggingface_hub pip-system-certs"
+          "uv pip install \"diffusers==0.39.0\" \"transformers==4.57.3\" accelerate sentencepiece protobuf pillow huggingface_hub pip-system-certs"
         ]
       }
     },
