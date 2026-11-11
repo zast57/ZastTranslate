@@ -2,7 +2,7 @@
 gradio>=4.0.0
 yt-dlp>=2024.0.0
 git+https://github.com/m-bain/whisperX.git
-git+https://github.com/huggingface/transformers.git
+transformers==4.57.3
 sentencepiece
 protobuf
 demucs>=4.0.0

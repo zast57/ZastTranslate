@@ -57,7 +57,7 @@ module.exports = {
         },
         // 4. Install llama-cpp-python for high-speed C++ GGUF inference & KV Cache
         {
-            when: "{{platform === 'win32'}}",
+            when: "{{platform === 'win32' && gpu === 'nvidia'}}",
             method: "shell.run",
             params: {
                 venv: "env",
@@ -68,6 +68,20 @@ module.exports = {
                     "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
                 },
                 message: "uv pip install https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.4-cu124/llama_cpp_python-0.3.4-cp310-cp310-win_amd64.whl || uv pip install llama-cpp-python"
+            }
+        },
+        {
+            when: "{{platform === 'win32' && gpu !== 'nvidia'}}",
+            method: "shell.run",
+            params: {
+                venv: "env",
+                path: ".",
+                env: {
+                    "UV_SYSTEM_CERTS": "true",
+                    "UV_INSECURE_HOST": "pypi.org,pypi.python.org,files.pythonhosted.org",
+                    "PIP_TRUSTED_HOST": "pypi.org pypi.python.org files.pythonhosted.org"
+                },
+                message: "uv pip install https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.36/llama_cpp_python-0.3.36-py3-none-win_amd64.whl || uv pip install llama-cpp-python"
             }
         },
         {
